@@ -764,3 +764,42 @@ The route for `/profile` already exists (from previous implementations):
    - If a customer, should also show order history with cancel options for "Placed" orders.
 
 This addresses all the fixes and implements the profile page. We’ll tackle UI improvements later as planned. Let me know if you need further adjustments! 🚀
+
+```
+submitReview() {
+  if (!this.authService.isLoggedIn() || this.authService.getUserRole() !== 'Customer') {
+    this.errorMessage = 'Please log in as a customer to submit a review';
+    return;
+  }
+
+  if (!this.product) {
+    this.errorMessage = 'Product not loaded. Please try again.';
+    return;
+  }
+
+  const reviewRequest: ReviewRequest = {
+    productId: this.product.id,
+    rating: this.selectedRating,
+    comment: this.newReview
+  };
+
+  this.reviewService.addReview(reviewRequest).subscribe({
+    next: (response) => {
+      if (response.success) {
+        this.reviewSubmitted = true;
+        this.newReview = '';
+        this.selectedRating = 0;
+        setTimeout(() => {
+          this.reviewSubmitted = false;
+        }, 3000);
+      } else {
+        this.errorMessage = response.message || 'Failed to submit review';
+      }
+    },
+    error: (err) => {
+      this.errorMessage = 'Error submitting review';
+      console.error(err);
+    }
+  });
+}
+```
