@@ -676,3 +676,359 @@ export const routes: Routes = [
    - Should have an "Edit Product" button linking to `/update-product/:id`.
 
 This implementation provides a professional and merchant-focused experience. Let me know if you’d like further refinements! 🚀
+
+
+
+Let’s address the issues and make the necessary updates to the `HeaderComponent` to ensure a seamless and professional experience. The main problems are:
+
+1. **Header Not Updating After Login**: The header (profile name, navbar options) doesn’t update immediately after login; a refresh is required. This is because the `ngOnInit` logic doesn’t re-run after login, and there’s no mechanism to react to authentication state changes.
+2. **Merchant Navbar Options**: The navbar still shows customer-specific options (e.g., "Products", "Deals", search bar) for merchants until refreshed. We’ll ensure these are hidden for merchants as previously implemented, but we’ll make it reactive.
+3. **Professional Tone**: We’ll remove the emojis and refine the dropdown labels (e.g., replace "Add Product 🆕" with "Create Product") to align with a professional design.
+
+I’ll also assume you’re using the latest `header.component.ts` from our previous interactions (with `isMerchant` and `cartService.cartUpdate$`), but I’ll ensure it’s reactive to login/logout events.
+
+---
+
+### Changes to `header.component.ts`
+We need to make the header reactive to authentication state changes. We’ll use a `BehaviorSubject` in `AuthService` to emit login/logout events and subscribe to it in `HeaderComponent`. This will ensure the header updates immediately after login without requiring a refresh.
+
+**Update `auth.service.ts` (Add Authentication State Subject)**:
+```typescript
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable, BehaviorSubject } from 'rxjs';
+import { tap } from 'rxjs/operators';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthService {
+  private baseUrl = 'https://api.eshoppingzone.com';
+  private authState = new BehaviorSubject<boolean>(this.isLoggedIn());
+  authState$ = this.authState.asObservable();
+
+  constructor(private http: HttpClient) {}
+
+  // Existing methods...
+
+  login(loginRequest: any): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/api/Auth/Login`, loginRequest).pipe(
+      tap(response => {
+        if (response.success && response.data) {
+          localStorage.setItem('token', response.data.token);
+          localStorage.setItem('role', response.data.role);
+          this.authState.next(true); // Emit login event
+        }
+      })
+    );
+  }
+
+  logout() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('role');
+    this.authState.next(false); // Emit logout event
+  }
+
+  isLoggedIn(): boolean {
+    return !!localStorage.getItem('token');
+  }
+
+  getUserRole(): string | null {
+    return localStorage.getItem('role');
+  }
+
+  viewProfile(): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/api/Auth/ViewProfile`);
+  }
+}
+```
+
+**Updated `header.component.ts`**:
+```typescript
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
+import { AuthService } from '../../services/auth.service';
+import { CartService } from '../../services/cart.service';
+import { Subscription } from 'rxjs';
+
+@Component({
+  selector: 'app-header',
+  standalone: true,
+  imports: [CommonModule, RouterLink, RouterLinkActive],
+  templateUrl: './header.component.html',
+  styleUrls: ['./header.component.css']
+})
+export class HeaderComponent implements OnInit, OnDestroy {
+  searchQuery: string = '';
+  isDropdownOpen: boolean = false;
+  cartItemCount: number = 0;
+  firstName: string | null = null;
+  isMerchant: boolean = false;
+  private authSubscription!: Subscription;
+
+  constructor(
+    public authService: AuthService,
+    private router: Router,
+    private cartService: CartService
+  ) {
+    this.updateCartCount();
+  }
+
+  ngOnInit() {
+    // Subscribe to auth state changes
+    this.authSubscription = this.authService.authState$.subscribe(isLoggedIn => {
+      this.updateHeaderState(isLoggedIn);
+    });
+
+    // Subscribe to navigation events to close dropdown
+    this.router.events.subscribe(event => {
+      if (event instanceof NavigationEnd) {
+        this.closeDropdown();
+      }
+    });
+  }
+
+  ngOnDestroy() {
+    if (this.authSubscription) {
+      this.authSubscription.unsubscribe();
+    }
+  }
+
+  updateHeaderState(isLoggedIn: boolean) {
+    if (isLoggedIn) {
+      this.authService.viewProfile().subscribe({
+        next: (response) => {
+          if (response.success && response.data) {
+            this.firstName = response.data.fullName.split(' ')[0];
+          }
+        },
+        error: (err) => {
+          console.error('Error fetching profile:', err);
+          this.firstName = null;
+        }
+      });
+
+      this.isMerchant = this.authService.getUserRole() === 'Merchant';
+
+      if (!this.isMerchant) {
+        this.cartService.cartUpdate$.subscribe(count => {
+          this.cartItemCount = count;
+        });
+        this.updateCartCount();
+      } else {
+        this.cartItemCount = 0; // Reset cart count for merchants
+      }
+    } else {
+      this.firstName = null;
+      this.isMerchant = false;
+      this.cartItemCount = 0;
+    }
+  }
+
+  search(event: Event) {
+    const query = (event.target as HTMLInputElement).value;
+    this.router.navigate(['/products'], { queryParams: { search: query } });
+  }
+
+  toggleDropdown(event?: Event) {
+    if (event) {
+      event.preventDefault();
+    }
+    this.isDropdownOpen = !this.isDropdownOpen;
+  }
+
+  closeDropdown() {
+    this.isDropdownOpen = false;
+  }
+
+  logout() {
+    this.authService.logout();
+    this.isDropdownOpen = false;
+  }
+
+  updateCartCount() {
+    if (this.authService.isLoggedIn() && this.authService.getUserRole() === 'Customer') {
+      this.cartService.getCart().subscribe({
+        next: (response) => {
+          if (response.success && response.data) {
+            this.cartItemCount = response.data.items.reduce((sum, item) => sum + item.quantity, 0);
+          }
+        },
+        error: (err) => {
+          console.error('Error fetching cart count:', err);
+        }
+      });
+    }
+  }
+
+  navigateTo(route: string) {
+    this.router.navigate([route]);
+    this.closeDropdown();
+  }
+}
+```
+
+#### Explanation of Changes in `header.component.ts`
+- **Reactive Auth State**:
+  - Added a `BehaviorSubject` in `AuthService` (`authState`) to emit login/logout events.
+  - Subscribed to `authState$` in `HeaderComponent` to update the header state (`firstName`, `isMerchant`, `cartItemCount`) whenever the user logs in or out.
+- **Lifecycle Hooks**:
+  - Implemented `OnDestroy` to unsubscribe from `authState$` and prevent memory leaks.
+- **State Reset**:
+  - When the user logs out, reset `firstName`, `isMerchant`, and `cartItemCount` to their default values.
+- **Preserved Existing Logic**:
+  - All existing methods (`search`, `toggleDropdown`, `closeDropdown`, `logout`, `navigateTo`, `updateCartCount`) remain unchanged.
+
+---
+
+### Changes to `header.component.html`
+We’ll update the HTML to:
+- Hide "Products", "Deals", and the search bar for merchants (already implemented, but ensuring it’s reactive).
+- Remove all emojis for a professional look.
+- Update dropdown labels to be more professional (e.g., "Create Product" instead of "Add Product 🆕").
+
+**Updated `header.component.html`**:
+```html
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+  <div class="container-fluid px-5">
+    <!-- Brand -->
+    <a class="navbar-brand fw-bold" [routerLink]="['/']">EShoppingZone</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+      aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <!-- Navbar Content -->
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <!-- Navigation Links -->
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-3">
+        <li class="nav-item">
+          <a class="nav-link" [routerLink]="['/']" routerLinkActive="active">Home</a>
+        </li>
+        <!-- Show Products and Deals only for non-merchants -->
+        <li class="nav-item" *ngIf="!isMerchant">
+          <a class="nav-link" [routerLink]="['/products']" routerLinkActive="active">Products</a>
+        </li>
+        <li class="nav-item" *ngIf="!isMerchant">
+          <a class="nav-link" [routerLink]="['/deals']" routerLinkActive="active">Deals</a>
+        </li>
+      </ul>
+
+      <!-- Search Bar (Only for non-merchants) -->
+      <div class="d-flex flex-grow-1 justify-content-center mx-3" *ngIf="!isMerchant">
+        <div class="input-group w-50">
+          <span class="input-group-text bg-light">
+            <i class="bi bi-search"></i>
+          </span>
+          <input type="text" class="form-control" placeholder="Search for products..." (input)="search($event)">
+        </div>
+      </div>
+
+      <!-- User Actions -->
+      <div class="navbar-nav ms-auto">
+        <ng-container *ngIf="!authService.isLoggedIn(); else loggedIn">
+          <li class="nav-item">
+            <a class="nav-link btn btn-outline-light me-2 login-signup-btn" [routerLink]="['/login']">Login</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link btn btn-outline-light login-signup-btn" [routerLink]="['/register']">Signup</a>
+          </li>
+        </ng-container>
+
+        <ng-template #loggedIn>
+          <!-- Cart Link for Customers -->
+          <li class="nav-item" *ngIf="!isMerchant">
+            <a class="nav-link text-white" [routerLink]="['/cart']">
+              Cart
+              <span *ngIf="cartItemCount > 0" class="badge bg-danger ms-1">{{ cartItemCount }}</span>
+            </a>
+          </li>
+
+          <!-- Profile Dropdown -->
+          <li class="nav-item dropdown" (click)="toggleDropdown(); $event.preventDefault()">
+            <a class="nav-link dropdown-toggle text-white" id="profileDropdown" role="button" aria-expanded="false">
+              {{ firstName ? firstName : 'Profile' }}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" [ngClass]="{'show': isDropdownOpen}" aria-labelledby="profileDropdown">
+              <!-- Common Options for All Users -->
+              <li>
+                <a class="dropdown-item" (click)="navigateTo('/profile')">Profile</a>
+              </li>
+              <li>
+                <a class="dropdown-item" (click)="navigateTo('/update-profile')">Update Profile</a>
+              </li>
+
+              <!-- Customer-Specific Options -->
+              <li *ngIf="!isMerchant">
+                <a class="dropdown-item" (click)="navigateTo('/manage-addresses')">Manage Addresses</a>
+              </li>
+              <li *ngIf="!isMerchant">
+                <a class="dropdown-item" (click)="navigateTo('/cart')">Place Order</a>
+              </li>
+              <li *ngIf="!isMerchant">
+                <a class="dropdown-item" (click)="navigateTo('/order-history')">Order History</a>
+              </li>
+
+              <!-- Merchant-Specific Options -->
+              <li *ngIf="isMerchant">
+                <a class="dropdown-item" (click)="navigateTo('/merchant-dashboard')">Dashboard</a>
+              </li>
+              <li *ngIf="isMerchant">
+                <a class="dropdown-item" (click)="navigateTo('/add-product')">Create Product</a>
+              </li>
+              <li *ngIf="isMerchant">
+                <a class="dropdown-item" (click)="navigateTo('/manage-products')">Manage Products</a>
+              </li>
+
+              <!-- Logout -->
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <a class="dropdown-item" (click)="logout()">Logout</a>
+              </li>
+            </ul>
+          </li>
+        </ng-template>
+      </div>
+    </div>
+  </div>
+</nav>
+```
+
+#### Explanation of Changes in `header.component.html`
+- **Professional Tone**:
+  - Removed all emojis (e.g., 🛍️, 🏠, 📦, 🎉, 🔑, 📝, 🛒, 👤, ✏️, 📊, 🆕, 🚪) to align with a professional design.
+  - Updated the "Add Product 🆕" label to "Create Product".
+- **Reactive Display**:
+  - Ensured `isMerchant` updates reactively after login, so the navbar options (e.g., "Products", "Deals", search bar) are hidden for merchants immediately.
+  - The `authService.isLoggedIn()` check is now reactive due to the `authState$` subscription.
+- **Consistency**:
+  - Kept the structure consistent with previous updates (e.g., hiding "Products" and "Deals" for merchants, showing "Cart" only for customers).
+
+---
+
+### Test
+1. **Login as Customer**:
+   - Immediately after login, the header should update to show the profile name (`firstName`), "Cart" link with item count, and customer-specific dropdown options ("Manage Addresses", "Place Order", "Order History").
+   - Navbar should show "Home", "Products", and "Deals".
+2. **Login as Merchant**:
+   - Immediately after login, the header should update to show the profile name, and merchant-specific dropdown options ("Dashboard", "Create Product", "Manage Products").
+   - "Products", "Deals", and search bar should be hidden.
+   - "Cart" link should not be visible.
+3. **Logout**:
+   - After logout, the header should immediately show "Login" and "Signup" buttons.
+4. **No Refresh Needed**:
+   - All changes (profile name, navbar options) should occur without refreshing the page.
+
+---
+
+### Summary of Fixes
+- **Header Not Updating After Login**:
+  - Added a `BehaviorSubject` in `AuthService` to emit auth state changes.
+  - Subscribed to `authState$` in `HeaderComponent` to update the header reactively.
+- **Merchant Navbar Options**:
+  - Ensured `isMerchant` updates reactively, hiding customer-specific options for merchants immediately after login.
+- **Professional Design**:
+  - Removed all emojis and updated labels (e.g., "Create Product") for a professional tone.
+
+This should resolve the issues and provide a polished, reactive header experience. Let me know if you need further adjustments! 🚀
