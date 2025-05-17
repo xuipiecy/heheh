@@ -1184,3 +1184,487 @@ Let’s think about how to verify these changes work as expected:
   - Verify the image gallery and reviews section display correctly.
 
 Does this approach make sense, and are you ready to apply these remaining changes and test them? 🚀
+
+
+
+
+Thank you for sharing the `ProductDetailComponent` code! Let’s analyze how reviews and ratings are handled in this component so we can apply the same functionality to the merchant side in `MerchantProductDetailComponent`. We’ll also examine the star-filling issue in the rating display, propose a fix (as requested to address at the end), and ensure the merchant’s rating display matches the customer’s implementation.
+
+---
+
+### Step 1: Analyze `ProductDetailComponent` for Ratings and Reviews
+Let’s break down how `ProductDetailComponent` handles ratings and reviews, focusing on the relevant parts:
+
+#### **Key Components in `ProductDetailComponent`**
+1. **Services Used**:
+   - `RatingService`: Fetches ratings for a product and user details for each rating.
+   - `ReviewService`: Submits new reviews (though we’re only focusing on displaying ratings for the merchant, not submitting them).
+
+2. **Rating Fetching Logic (`loadRatings`)**:
+   - The `loadRatings` method calls `ratingService.getRatingsByProduct(productId)` to fetch ratings.
+   - For each rating, it fetches the user’s details using `ratingService.getUserDetails(rating.userProfileId)` to get the reviewer’s name.
+   - The ratings are stored in `ratings: any[]`, with each rating object enhanced to include `reviewerName`.
+
+   ```typescript
+   loadRatings(productId: number) {
+     this.ratingService.getRatingsByProduct(productId).subscribe({
+       next: (response) => {
+         if (response.success && response.data) {
+           const Apiratings = response.data;
+           Apiratings.forEach(rating => {
+             this.ratingService.getUserDetails(rating.userProfileId).subscribe({
+               next: (userResponse) => {
+                 if (userResponse != null) {
+                   this.ratings.push({ ...rating, reviewerName: userResponse.fullName });
+                 }
+               },
+               error: (err) => {
+                 this.ratings.push({ ...rating, reviewerName: 'Unknown User' });
+               }
+             });
+           });
+         }
+       },
+       error: (err) => {
+         console.error('Error fetching ratings:', err);
+       }
+     });
+   }
+   ```
+
+3. **Rating Display in Template**:
+   - The template displays each rating with stars, the review text, the reviewer’s name, and the date.
+   - Stars are rendered using a loop with Bootstrap icons (`bi-star-fill` for filled stars, `bi-star` for empty stars).
+
+   ```html
+   <div *ngFor="let rating of ratings">
+     <div class="d-flex align-items-center mb-2">
+       <ng-container *ngFor="let i of [1,2,3,4,5]; let index = index">
+         <i class="bi bi-star-fill text-warning me-1" *ngIf="rating.starRating >= index + 1"></i>
+         <i class="bi bi-star text-warning me-1" *ngIf="rating.starRating <= index"></i>
+       </ng-container>
+     </div>
+     <p *ngIf="rating.review" class="mb-2">{{ rating.review }}</p>
+     <p class="text-muted small">BY {{ rating.reviewerName }}, {{ formatDate(rating.createdAt) }}</p>
+   </div>
+   ```
+
+4. **Average Rating Display**:
+   - The average rating is displayed using `product.averageRating`, with stars rendered using `filledStars` and `partialStarPercentage`.
+   - The `calculateStarRating` method computes how many stars to fill fully and the percentage for a partial star.
+
+   ```typescript
+   calculateStarRating(avgRating: number) {
+     this.filledStars = Math.floor(avgRating);
+     const fractionalPart = avgRating - this.filledStars;
+     this.partialStarPercentage = Math.round(fractionalPart * 100);
+   }
+   ```
+
+   ```html
+   <div class="star-rating">
+     <span *ngFor="let star of [1, 2, 3, 4, 5]; let i = index" class="star">
+       <span *ngIf="i < filledStars" class="filled">★</span>
+       <span *ngIf="i === filledStars && partialStarPercentage > 0" class="partial" [style.width.%]="partialStarPercentage">★</span>
+       <span *ngIf="i >= filledStars && (i !== filledStars || partialStarPercentage === 0)">☆</span>
+     </span>
+   </div>
+   ```
+
+5. **Star-Filling Issue**:
+   - The issue in the star-filling code lies in the conditions and rendering logic for partial stars:
+     - The condition `rating.starRating <= index` in the reviews section doesn’t handle partial stars (e.g., a rating of 3.5 shows 3 filled stars and 2 empty stars, missing the 0.5 partial star).
+     - The `calculateStarRating` method for the average rating computes `partialStarPercentage`, but the template logic has a flaw: the partial star condition doesn’t always render correctly due to overlapping conditions.
+   - We’ll fix this at the end, as requested, but let’s note the issue: the partial star rendering needs adjustment to handle fractional ratings more accurately.
+
+---
+
+### Step 2: Apply Rating Display to `MerchantProductDetailComponent`
+We need to update `MerchantProductDetailComponent` to fetch and display ratings and reviews using `RatingService`, matching the customer-side implementation. The merchant should see the same rating and review display as the customer, including the average rating with stars and the list of reviews with stars, reviewer names, and dates.
+
+#### **Updated `MerchantProductDetailComponent`**
+**`merchant-product-detail.component.ts`**:
+```typescript
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ProductService, ProductResponse } from '../../services/product.service';
+import { RatingService, ProfileDetails } from '../../services/rating.service'; // Import RatingService
+import { ActivatedRoute, RouterLink } from '@angular/router';
+
+@Component({
+  selector: 'app-merchant-product-detail',
+  standalone: true,
+  imports: [CommonModule, RouterLink],
+  templateUrl: './merchant-product-detail.component.html',
+  styleUrls: ['./merchant-product-detail.component.css']
+})
+export class MerchantProductDetailComponent implements OnInit {
+  product: ProductResponse | null = null;
+  ratings: any[] = []; // Match the structure in ProductDetailComponent
+  errorMessage: string | null = null;
+  currentImageIndex: number = 0;
+  filledStars: number = 0; // For average rating stars
+  partialStarPercentage: number = 0;
+
+  constructor(
+    private productService: ProductService,
+    private ratingService: RatingService, // Inject RatingService
+    private route: ActivatedRoute
+  ) {}
+
+  ngOnInit() {
+    const productId = Number(this.route.snapshot.paramMap.get('id'));
+    this.loadProduct(productId);
+    this.loadRatings(productId);
+    if (this.product?.averageRating) {
+      this.calculateStarRating(this.product.averageRating);
+    }
+  }
+
+  loadProduct(productId: number) {
+    this.productService.getProduct(productId).subscribe({
+      next: (response) => {
+        if (response.success && response.data) {
+          this.product = response.data;
+          if (this.product.averageRating) {
+            this.calculateStarRating(this.product.averageRating); // Calculate stars for average rating
+          }
+        } else {
+          this.errorMessage = response.message || 'Product not found';
+        }
+      },
+      error: (err) => {
+        this.errorMessage = 'Error loading product';
+        console.error(err);
+      }
+    });
+  }
+
+  loadRatings(productId: number) {
+    this.ratingService.getRatingsByProduct(productId).subscribe({
+      next: (response) => {
+        if (response.success && response.data) {
+          const Apiratings = response.data;
+          Apiratings.forEach(rating => {
+            this.ratingService.getUserDetails(rating.userProfileId).subscribe({
+              next: (userResponse) => {
+                if (userResponse != null) {
+                  this.ratings.push({ ...rating, reviewerName: userResponse.fullName });
+                }
+              },
+              error: (err) => {
+                console.error(`Error fetching user details for user ${rating.userProfileId}:`, err);
+                this.ratings.push({ ...rating, reviewerName: 'Unknown User' });
+              }
+            });
+          });
+        }
+      },
+      error: (err) => {
+        console.error('Error fetching ratings:', err);
+      }
+    });
+  }
+
+  calculateStarRating(avgRating: number) {
+    this.filledStars = Math.floor(avgRating);
+    const fractionalPart = avgRating - this.filledStars;
+    this.partialStarPercentage = Math.round(fractionalPart * 100);
+  }
+
+  changeImage(direction: number) {
+    if (this.product && this.product.images) {
+      const images = this.product.images.split(',');
+      this.currentImageIndex = (this.currentImageIndex + direction + images.length) % images.length;
+    }
+  }
+
+  formatDate(dateString: string): string {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true });
+  }
+}
+```
+
+**`merchant-product-detail.component.html`** (Updated to match customer display):
+```html
+<div class="container py-5 px-5">
+  <h2 class="fw-bold mb-4">Product Details</h2>
+  <div *ngIf="errorMessage" class="alert alert-danger" role="alert">
+    {{ errorMessage }}
+  </div>
+  <div *ngIf="product" class="card shadow-sm border-0">
+    <div class="row g-0">
+      <div class="col-md-4">
+        <div class="position-relative">
+          <img *ngIf="product.images" [src]="product.images.split(',')[currentImageIndex]" class="img-fluid rounded-start" alt="{{ product.name }}" style="height: 100%; object-fit: cover;">
+          <div *ngIf="!product.images" class="bg-light d-flex align-items-center justify-content-center" style="height: 100%;">
+            <span class="text-muted">No Image</span>
+          </div>
+          <button *ngIf="product.images && product.images.split(',').length > 1" class="btn btn-outline-secondary position-absolute start-0 top-50 translate-middle-y" (click)="changeImage(-1)">Previous</button>
+          <button *ngIf="product.images && product.images.split(',').length > 1" class="btn btn-outline-secondary position-absolute end-0 top-50 translate-middle-y" (click)="changeImage(1)">Next</button>
+        </div>
+      </div>
+      <div class="col-md-8">
+        <div class="card-body">
+          <h3 class="card-title">{{ product.name }}</h3>
+          <div class="d-flex align-items-center mb-2">
+            <div class="star-rating">
+              <span *ngFor="let star of [1, 2, 3, 4, 5]; let i = index" class="star">
+                <span *ngIf="i < filledStars" class="filled">★</span>
+                <span *ngIf="i === filledStars && partialStarPercentage > 0" class="partial" [style.width.%]="partialStarPercentage">★</span>
+                <span *ngIf="i >= filledStars && (i !== filledStars || partialStarPercentage === 0)">☆</span>
+              </span>
+            </div>
+            <span class="ms-2">({{ product.averageRating | number:'1.1-1' }} / 5, {{ product.reviewCount }} reviews)</span>
+          </div>
+          <p class="card-text"><strong>Price:</strong> {{ product.price | currency }}</p>
+          <p class="card-text"><strong>Stock:</strong> {{ product.stock }}</p>
+          <p class="card-text"><strong>Category:</strong> {{ product.category || 'Not specified' }}</p>
+          <p class="card-text"><strong>Type:</strong> {{ product.type || 'Not specified' }}</p>
+          <p class="card-text"><strong>Description:</strong> {{ product.description || 'No description provided' }}</p>
+          <p class="card-text"><strong>Specifications:</strong> {{ product.specifications || 'No specifications provided' }}</p>
+          <div class="mt-4">
+            <a [routerLink]="['/update-product', product.id]" class="btn btn-primary me-2">Edit Product</a>
+            <a [routerLink]="['/manage-products']" class="btn btn-outline-secondary">Back to Manage Products</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ratings and Reviews Section -->
+  <div class="mt-5" *ngIf="product">
+    <h3 class="fw-bold mb-3">Ratings & Reviews</h3>
+    <div class="mb-4">
+      <h5>Average Rating: {{ product.averageRating | number:'1.1-1' }} / 5 ({{ product.reviewCount }} reviews)</h5>
+    </div>
+    <div *ngIf="ratings.length > 0; else noReviews">
+      <div class="border rounded p-3 mb-3" *ngFor="let rating of ratings">
+        <div class="d-flex align-items-center mb-2">
+          <ng-container *ngFor="let i of [1,2,3,4,5]; let index = index">
+            <i class="bi bi-star-fill text-warning me-1" *ngIf="rating.starRating >= index + 1"></i>
+            <i class="bi bi-star text-warning me-1" *ngIf="rating.starRating <= index"></i>
+          </ng-container>
+        </div>
+        <p *ngIf="rating.review" class="mb-2">{{ rating.review }}</p>
+        <p class="text-muted small">BY {{ rating.reviewerName }}, {{ formatDate(rating.createdAt) }}</p>
+      </div>
+    </div>
+    <ng-template #noReviews>
+      <p class="text-muted">No reviews yet for this product.</p>
+    </ng-template>
+  </div>
+</div>
+```
+
+**`merchant-product-detail.component.css`** (Unchanged from last response):
+```css
+.card {
+  border-radius: 8px;
+}
+.img-fluid {
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+.card-body {
+  padding: 2rem;
+}
+.position-relative {
+  height: 100%;
+}
+.btn-outline-secondary {
+  background-color: rgba(255, 255, 255, 0.8);
+}
+```
+
+**Explanation**:
+- **Reused `RatingService`**:
+  - Imported `RatingService` and used its `getRatingsByProduct` and `getUserDetails` methods to fetch ratings and reviewer names, exactly as done in `ProductDetailComponent`.
+- **Added Average Rating Display**:
+  - Added `filledStars` and `partialStarPercentage` properties and the `calculateStarRating` method to display the average rating with stars, matching the customer side.
+- **Updated Template**:
+  - Added the "Ratings & Reviews" section to display the average rating and list of reviews, using the same HTML structure as `ProductDetailComponent`.
+  - The star rendering for individual reviews uses Bootstrap icons (`bi-star-fill` and `bi-star`), consistent with the customer view.
+- **Reused `formatDate`**:
+  - Copied the `formatDate` method to format the review date in the same way as the customer view.
+
+---
+
+### Step 3: Fix the Star-Filling Issue
+Now, let’s address the star-filling issue in both `ProductDetailComponent` and `MerchantProductDetailComponent`. The issue is in two places:
+1. **Average Rating Stars**:
+   - The `calculateStarRating` method computes `filledStars` and `partialStarPercentage`, but the template logic has overlapping conditions, causing partial stars to render incorrectly.
+2. **Individual Review Stars**:
+   - The condition `rating.starRating <= index` doesn’t account for partial stars (e.g., a rating of 3.5 shows 3 filled stars and 2 empty stars, missing the partial star).
+
+#### **Fixing the Star Rendering**
+We’ll fix both components by:
+- Adjusting the template logic for individual review stars to handle partial ratings.
+- Simplifying the average rating star rendering to avoid overlapping conditions.
+
+**Updated Star Rendering Logic for Both Components**:
+1. **Individual Review Stars**:
+   - We’ll modify the star rendering to show filled stars for whole numbers, a partial star for fractional ratings, and empty stars for the rest.
+2. **Average Rating Stars**:
+   - Fix the template conditions to ensure the partial star renders correctly.
+
+#### **Update for `ProductDetailComponent`**
+**`product-detail.component.ts`** (Add Fix in `loadRatings`):
+```typescript
+loadRatings(productId: number) {
+  this.ratingService.getRatingsByProduct(productId).subscribe({
+    next: (response) => {
+      if (response.success && response.data) {
+        const Apiratings = response.data;
+        Apiratings.forEach(rating => {
+          this.ratingService.getUserDetails(rating.userProfileId).subscribe({
+            next: (userResponse) => {
+              if (userResponse != null) {
+                // Calculate star display for each rating
+                const filledStars = Math.floor(rating.starRating);
+                const partialStarPercentage = (rating.starRating - filledStars) * 100;
+                this.ratings.push({ ...rating, reviewerName: userResponse.fullName, filledStars, partialStarPercentage });
+              }
+            },
+            error: (err) => {
+              console.error(`Error fetching user details for user ${rating.userProfileId}:`, err);
+              const filledStars = Math.floor(rating.starRating);
+              const partialStarPercentage = (rating.starRating - filledStars) * 100;
+              this.ratings.push({ ...rating, reviewerName: 'Unknown User', filledStars, partialStarPercentage });
+            }
+          });
+        });
+      }
+    },
+    error: (err) => {
+      console.error('Error fetching ratings:', err);
+    }
+  });
+}
+```
+
+**`product-detail.component.html`** (Fix Star Rendering):
+Replace the "Ratings & Reviews" section with:
+```html
+<div class="mt-5">
+  <h3 class="fw-bold mb-3">Ratings & Reviews</h3>
+  <div class="mb-4">
+    <h5>Average Rating: {{ product!.averageRating.toFixed(1) }} / 5 ({{ product!.reviewCount }} reviews)</h5>
+    <div class="star-rating">
+      <span *ngFor="let star of [1, 2, 3, 4, 5]; let i = index" class="star">
+        <span *ngIf="i < filledStars" class="filled">★</span>
+        <span *ngIf="i === filledStars && partialStarPercentage > 0" class="partial" [style.clip-path]="'inset(0 ' + (100 - partialStarPercentage) + '% 0 0)'">★</span>
+        <span *ngIf="i > filledStars || (i === filledStars && partialStarPercentage === 0)">☆</span>
+      </span>
+    </div>
+  </div>
+  <div *ngIf="ratings.length > 0; else noReviews">
+    <div class="border rounded p-3 mb-3" *ngFor="let rating of ratings">
+      <div class="d-flex align-items-center mb-2">
+        <span *ngFor="let i of [1, 2, 3, 4, 5]; let index = index" class="star">
+          <i class="bi bi-star-fill text-warning me-1" *ngIf="index < rating.filledStars"></i>
+          <i class="bi bi-star-fill text-warning me-1" *ngIf="index === rating.filledStars && rating.partialStarPercentage > 0" [style.clip-path]="'inset(0 ' + (100 - rating.partialStarPercentage) + '% 0 0)'"></i>
+          <i class="bi bi-star text-warning me-1" *ngIf="index >= rating.filledStars && (index !== rating.filledStars || rating.partialStarPercentage === 0)"></i>
+        </span>
+      </div>
+      <p *ngIf="rating.review" class="mb-2">{{ rating.review }}</p>
+      <p class="text-muted small">BY {{ rating.reviewerName }}, {{ formatDate(rating.createdAt) }}</p>
+    </div>
+  </div>
+  <ng-template #noReviews>
+    <p class="text-muted">No reviews yet for this product.</p>
+  </ng-template>
+</div>
+```
+
+#### **Update for `MerchantProductDetailComponent`**
+**`merchant-product-detail.component.ts`** (Add Fix in `loadRatings`):
+```typescript
+loadRatings(productId: number) {
+  this.ratingService.getRatingsByProduct(productId).subscribe({
+    next: (response) => {
+      if (response.success && response.data) {
+        const Apiratings = response.data;
+        Apiratings.forEach(rating => {
+          this.ratingService.getUserDetails(rating.userProfileId).subscribe({
+            next: (userResponse) => {
+              if (userResponse != null) {
+                const filledStars = Math.floor(rating.starRating);
+                const partialStarPercentage = (rating.starRating - filledStars) * 100;
+                this.ratings.push({ ...rating, reviewerName: userResponse.fullName, filledStars, partialStarPercentage });
+              }
+            },
+            error: (err) => {
+              console.error(`Error fetching user details for user ${rating.userProfileId}:`, err);
+              const filledStars = Math.floor(rating.starRating);
+              const partialStarPercentage = (rating.starRating - filledStars) * 100;
+              this.ratings.push({ ...rating, reviewerName: 'Unknown User', filledStars, partialStarPercentage });
+            }
+          });
+        });
+      }
+    },
+    error: (err) => {
+      console.error('Error fetching ratings:', err);
+    }
+  });
+}
+```
+
+**`merchant-product-detail.component.html`** (Fix Star Rendering):
+Update the "Ratings & Reviews" section:
+```html
+<div class="mt-5" *ngIf="product">
+  <h3 class="fw-bold mb-3">Ratings & Reviews</h3>
+  <div class="mb-4">
+    <h5>Average Rating: {{ product.averageRating | number:'1.1-1' }} / 5 ({{ product.reviewCount }} reviews)</h5>
+    <div class="star-rating">
+      <span *ngFor="let star of [1, 2, 3, 4, 5]; let i = index" class="star">
+        <span *ngIf="i < filledStars" class="filled">★</span>
+        <span *ngIf="i === filledStars && partialStarPercentage > 0" class="partial" [style.clip-path]="'inset(0 ' + (100 - partialStarPercentage) + '% 0 0)'">★</span>
+        <span *ngIf="i > filledStars || (i === filledStars && partialStarPercentage === 0)">☆</span>
+      </span>
+    </div>
+  </div>
+  <div *ngIf="ratings.length > 0; else noReviews">
+    <div class="border rounded p-3 mb-3" *ngFor="let rating of ratings">
+      <div class="d-flex align-items-center mb-2">
+        <span *ngFor="let i of [1, 2, 3, 4, 5]; let index = index" class="star">
+          <i class="bi bi-star-fill text-warning me-1" *ngIf="index < rating.filledStars"></i>
+          <i class="bi bi-star-fill text-warning me-1" *ngIf="index === rating.filledStars && rating.partialStarPercentage > 0" [style.clip-path]="'inset(0 ' + (100 - rating.partialStarPercentage) + '% 0 0)'"></i>
+          <i class="bi bi-star text-warning me-1" *ngIf="index > rating.filledStars || (index === rating.filledStars && rating.partialStarPercentage === 0)"></i>
+        </span>
+      </div>
+      <p *ngIf="rating.review" class="mb-2">{{ rating.review }}</p>
+      <p class="text-muted small">BY {{ rating.reviewerName }}, {{ formatDate(rating.createdAt) }}</p>
+    </div>
+  </div>
+  <ng-template #noReviews>
+    <p class="text-muted">No reviews yet for this product.</p>
+  </ng-template>
+</div>
+```
+
+**Explanation of Fix**:
+- **Individual Review Stars**:
+  - Added `filledStars` and `partialStarPercentage` to each rating object when pushing to the `ratings` array.
+  - Updated the template to render filled stars, a partial star (using `clip-path` to show a portion of the star), and empty stars.
+- **Average Rating Stars**:
+  - Fixed the conditions to avoid overlap: a star is either fully filled, partially filled, or empty, with no overlapping rendering.
+  - Used `clip-path` instead of `width` for partial stars to ensure better rendering across browsers.
+- **Consistency**:
+  - Both components now use the same star rendering logic for consistency.
+
+---
+
+### Summary of Changes
+The `MerchantProductDetailComponent` now displays ratings and reviews exactly like the customer side, using `RatingService`. The star-filling issue has been fixed in both components by improving the rendering logic for partial stars. The remaining changes from the previous responses (e.g., creating `MerchantHomeComponent`, updating `app.routes.ts`, `RoleGuard`, and `ManageProductsComponent`) are still needed and unchanged.
+
+**Test Scenarios**:
+- **Merchant Product Detail**:
+  - Check if ratings and reviews display with correct star rendering (e.g., a 3.5 rating shows 3 filled stars and a half-filled star).
+- **Customer Product Detail**:
+  - Verify the star rendering fix works for both average and individual ratings.
+
+Are you ready to apply these updates and test the functionality? 🚀
