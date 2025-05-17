@@ -1,128 +1,51 @@
-Let’s make the necessary updates to the `HeaderComponent` to enhance the merchant experience while ensuring the existing logic for customers and other users remains unaffected. We’ll focus on updating the navbar dropdown to include merchant-specific options (as previously implemented) and refine the HTML structure to make it more intuitive and consistent for all user types. I’ll also ensure the `cartItemCount` updates in real-time by subscribing to the `cartService.cartUpdate$` observable (already implemented earlier).
+Let’s address the issues you’ve raised and enhance the merchant experience in a professional manner. We’ll focus on creating a tailored experience for merchants that aligns with their role, ensuring the interface is sleek, functional, and professional. I’ll avoid childish elements and focus on a design that a professional developer would implement for a business application like EShoppingZone.
 
-### Changes to `header.component.ts`
-We’ll add the `isMerchant` property to determine the user role and ensure the cart count updates in real-time for customers. The existing logic (e.g., dropdown closing, search, logout) will remain unchanged.
+---
 
-**Updated `header.component.ts`**:
-```typescript
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
-import { AuthService } from '../../services/auth.service';
-import { CartService } from '../../services/cart.service';
+### Issues to Fix and Plan
 
-@Component({
-  selector: 'app-header',
-  standalone: true,
-  imports: [CommonModule, RouterLink, RouterLinkActive],
-  templateUrl: './header.component.html',
-  styleUrls: ['./header.component.css']
-})
-export class HeaderComponent {
-  searchQuery: string = '';
-  isDropdownOpen: boolean = false;
-  cartItemCount: number = 0;
-  firstName: string | null = null;
-  isMerchant: boolean = false; // Add property to identify merchant role
+1. **Merchant Should Not Have "Products" in Navbar**:
+   - Remove the "Products" link from the navbar for merchants since they don’t need to browse products like customers do.
+   - Adjust the navbar to focus on merchant-specific actions (e.g., manage products, dashboard).
 
-  constructor(public authService: AuthService, private router: Router, private cartService: CartService) {
-    this.updateCartCount();
-  }
+2. **Home Page for Merchants Should Be Different**:
+   - Currently, the home page (`HomeComponent`) is the same for all users, showing all products. For merchants, redirect them to the `MerchantDashboardComponent` as their home page instead of showing customer-focused content.
 
-  ngOnInit() {
-    this.router.events.subscribe(event => {
-      if (event instanceof NavigationEnd) {
-        this.closeDropdown();
-      }
-    });
+3. **Merchant Dashboard Needs to Be More Professional**:
+   - Redesign the dashboard to display more relevant metrics (e.g., total products, total stock, products with low stock, total sales/orders if API available).
+   - Fix the average rating calculation to exclude products with no reviews (i.e., `reviewCount == 0`).
+   - Use a cleaner, more professional layout.
 
-    if (this.authService.isLoggedIn()) {
-      this.authService.viewProfile().subscribe({
-        next: (response) => {
-          if (response.success && response.data) {
-            this.firstName = response.data.fullName.split(' ')[0];
-          }
-        },
-        error: (err) => {
-          console.error('Error fetching profile:', err);
-          this.firstName = null;
-        }
-      });
+4. **Manage Products Enhancements**:
+   - Add an "Add Product" button directly in `ManageProductsComponent`.
+   - Display product images (using the `images` field from `ProductResponse`).
+   - Allow merchants to click a product to view a detailed page (`MerchantProductDetailComponent`) with an option to edit from there.
+   - Improve the layout to look more professional.
 
-      // Set user role
-      this.isMerchant = this.authService.getUserRole() === 'Merchant';
+5. **Profile Dropdown - Remove Childish "Add Product" Option**:
+   - Replace the "Add Product 🆕" option in the dropdown with a more professional label (e.g., "Create Product").
+   - Ensure the dropdown aligns with a professional tone.
 
-      // Subscribe to cart updates for real-time cart count (for customers only)
-      if (!this.isMerchant) {
-        this.cartService.cartUpdate$.subscribe(count => {
-          this.cartItemCount = count;
-        });
-      }
-    }
-  }
+6. **Overall Professional Approach**:
+   - Use consistent, professional terminology (e.g., avoid emojis in critical areas, use proper labels).
+   - Focus on functionality and usability for a business user (merchant).
 
-  search(event: Event) {
-    const query = (event.target as HTMLInputElement).value;
-    this.router.navigate(['/products'], { queryParams: { search: query } });
-  }
+---
 
-  toggleDropdown(event?: Event) {
-    if (event) {
-      event.preventDefault();
-    }
-    this.isDropdownOpen = !this.isDropdownOpen;
-  }
+### Implementation
 
-  closeDropdown() {
-    this.isDropdownOpen = false;
-  }
+#### 1. Update Navbar to Remove "Products" for Merchants
+We’ll modify the `HeaderComponent` to conditionally hide the "Products" link for merchants and update the dropdown labels to be more professional.
 
-  logout() {
-    this.authService.logout();
-    this.isDropdownOpen = false;
-  }
+**Changes to `header.component.ts`**:
+The logic remains largely the same, but we’ll ensure the `isMerchant` property is used to control visibility. No changes are needed here since `isMerchant` is already defined.
 
-  updateCartCount() {
-    if (this.authService.isLoggedIn() && this.authService.getUserRole() === 'Customer') {
-      this.cartService.getCart().subscribe({
-        next: (response) => {
-          if (response.success && response.data) {
-            this.cartItemCount = response.data.items.reduce((sum, item) => sum + item.quantity, 0); // Use total quantity
-          }
-        },
-        error: (err) => {
-          console.error('Error fetching cart count:', err);
-        }
-      });
-    }
-  }
-
-  navigateTo(route: string) {
-    this.router.navigate([route]);
-    this.closeDropdown();
-  }
-}
-```
-
-#### Explanation of Changes in `header.component.ts`
-- **Added `isMerchant` Property**: Determines if the logged-in user is a merchant, used to conditionally render merchant-specific options in the dropdown.
-- **Real-Time Cart Count**: Subscribed to `cartService.cartUpdate$` in `ngOnInit` to ensure the cart count updates in real-time for customers (already implemented earlier, just ensuring it’s here).
-- **Preserved Existing Logic**: All existing methods (`search`, `toggleDropdown`, `closeDropdown`, `logout`, `navigateTo`) remain unchanged to avoid affecting previous functionality.
-- **Updated `updateCartCount`**: Changed to use `reduce` to sum the quantities of items (already implemented earlier, just ensuring consistency).
-
-### Changes to `header.component.html`
-We’ll update the HTML to:
-- Improve the dropdown structure for better usability.
-- Add merchant-specific options ("Dashboard", "Add Product", "Manage Products") while keeping customer-specific options ("Cart", "Place Order", "Order History").
-- Ensure the layout is clean and consistent for all user types.
-- Add icons for visual clarity (using emoji placeholders since UI will be polished later).
-
-**Updated `header.component.html`**:
+**Changes to `header.component.html`**:
 ```html
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
   <div class="container-fluid px-5">
     <!-- Brand -->
-    <a class="navbar-brand fw-bold" [routerLink]="['/']">EShoppingZone 🛍️</a>
+    <a class="navbar-brand fw-bold" [routerLink]="['/']">EShoppingZone</a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
       aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
@@ -133,18 +56,19 @@ We’ll update the HTML to:
       <!-- Navigation Links -->
       <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-3">
         <li class="nav-item">
-          <a class="nav-link" [routerLink]="['/']" routerLinkActive="active">Home 🏠</a>
+          <a class="nav-link" [routerLink]="['/']" routerLinkActive="active">Home</a>
         </li>
-        <li class="nav-item">
-          <a class="nav-link" [routerLink]="['/products']" routerLinkActive="active">Products 📦</a>
+        <!-- Show Products and Deals only for non-merchants -->
+        <li class="nav-item" *ngIf="!isMerchant">
+          <a class="nav-link" [routerLink]="['/products']" routerLinkActive="active">Products</a>
         </li>
-        <li class="nav-item">
-          <a class="nav-link" [routerLink]="['/deals']" routerLinkActive="active">Deals 🎉</a>
+        <li class="nav-item" *ngIf="!isMerchant">
+          <a class="nav-link" [routerLink]="['/deals']" routerLinkActive="active">Deals</a>
         </li>
       </ul>
 
-      <!-- Search Bar -->
-      <div class="d-flex flex-grow-1 justify-content-center mx-3">
+      <!-- Search Bar (Only for non-merchants) -->
+      <div class="d-flex flex-grow-1 justify-content-center mx-3" *ngIf="!isMerchant">
         <div class="input-group w-50">
           <span class="input-group-text bg-light">
             <i class="bi bi-search"></i>
@@ -157,10 +81,10 @@ We’ll update the HTML to:
       <div class="navbar-nav ms-auto">
         <ng-container *ngIf="!authService.isLoggedIn(); else loggedIn">
           <li class="nav-item">
-            <a class="nav-link btn btn-outline-light me-2 login-signup-btn" [routerLink]="['/login']">Login 🔑</a>
+            <a class="nav-link btn btn-outline-light me-2 login-signup-btn" [routerLink]="['/login']">Login</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link btn btn-outline-light login-signup-btn" [routerLink]="['/register']">Signup 📝</a>
+            <a class="nav-link btn btn-outline-light login-signup-btn" [routerLink]="['/register']">Signup</a>
           </li>
         </ng-container>
 
@@ -168,7 +92,7 @@ We’ll update the HTML to:
           <!-- Cart Link for Customers -->
           <li class="nav-item" *ngIf="!isMerchant">
             <a class="nav-link text-white" [routerLink]="['/cart']">
-              Cart 🛒
+              Cart
               <span *ngIf="cartItemCount > 0" class="badge bg-danger ms-1">{{ cartItemCount }}</span>
             </a>
           </li>
@@ -176,43 +100,43 @@ We’ll update the HTML to:
           <!-- Profile Dropdown -->
           <li class="nav-item dropdown" (click)="toggleDropdown(); $event.preventDefault()">
             <a class="nav-link dropdown-toggle text-white" id="profileDropdown" role="button" aria-expanded="false">
-              {{ firstName ? firstName : 'Profile' }} 👤
+              {{ firstName ? firstName : 'Profile' }}
             </a>
             <ul class="dropdown-menu dropdown-menu-end" [ngClass]="{'show': isDropdownOpen}" aria-labelledby="profileDropdown">
               <!-- Common Options for All Users -->
               <li>
-                <a class="dropdown-item" (click)="navigateTo('/profile')">Profile 👤</a>
+                <a class="dropdown-item" (click)="navigateTo('/profile')">Profile</a>
               </li>
               <li>
-                <a class="dropdown-item" (click)="navigateTo('/update-profile')">Update Profile ✏️</a>
+                <a class="dropdown-item" (click)="navigateTo('/update-profile')">Update Profile</a>
               </li>
 
               <!-- Customer-Specific Options -->
               <li *ngIf="!isMerchant">
-                <a class="dropdown-item" (click)="navigateTo('/manage-addresses')">Manage Addresses 🏠</a>
+                <a class="dropdown-item" (click)="navigateTo('/manage-addresses')">Manage Addresses</a>
               </li>
               <li *ngIf="!isMerchant">
-                <a class="dropdown-item" (click)="navigateTo('/cart')">Place Order 🛍️</a>
+                <a class="dropdown-item" (click)="navigateTo('/cart')">Place Order</a>
               </li>
               <li *ngIf="!isMerchant">
-                <a class="dropdown-item" (click)="navigateTo('/order-history')">Order History 📦</a>
+                <a class="dropdown-item" (click)="navigateTo('/order-history')">Order History</a>
               </li>
 
               <!-- Merchant-Specific Options -->
               <li *ngIf="isMerchant">
-                <a class="dropdown-item" (click)="navigateTo('/merchant-dashboard')">Dashboard 📊</a>
+                <a class="dropdown-item" (click)="navigateTo('/merchant-dashboard')">Dashboard</a>
               </li>
               <li *ngIf="isMerchant">
-                <a class="dropdown-item" (click)="navigateTo('/add-product')">Add Product 🆕</a>
+                <a class="dropdown-item" (click)="navigateTo('/add-product')">Create Product</a>
               </li>
               <li *ngIf="isMerchant">
-                <a class="dropdown-item" (click)="navigateTo('/manage-products')">Manage Products 📦</a>
+                <a class="dropdown-item" (click)="navigateTo('/manage-products')">Manage Products</a>
               </li>
 
               <!-- Logout -->
               <li><hr class="dropdown-divider"></li>
               <li>
-                <a class="dropdown-item" (click)="logout()">Logout 🚪</a>
+                <a class="dropdown-item" (click)="logout()">Logout</a>
               </li>
             </ul>
           </li>
@@ -223,149 +147,83 @@ We’ll update the HTML to:
 </nav>
 ```
 
-#### Explanation of Changes in `header.component.html`
-- **Structural Improvements**:
-  - Wrapped navigation items (`Home`, `Products`, `Deals`) in `<li>` tags for consistency with Bootstrap’s navbar structure.
-  - Moved the cart link and profile dropdown into a `<li>` structure under `navbar-nav` for better alignment.
-  - Added `ms-auto` to the user actions section to align it to the right.
-- **Enhanced Dropdown**:
-  - Separated options into sections: common options (Profile, Update Profile), customer-specific options (Manage Addresses, Place Order, Order History), and merchant-specific options (Dashboard, Add Product, Manage Products).
-  - Added a divider (`<hr>`) before the "Logout" option for visual separation.
-  - Removed the redundant "Manage Products" link outside the dropdown (already present in the dropdown for merchants).
-- **Visual Clarity**:
-  - Added emojis to each menu item for better visual distinction (e.g., 🏠 for Home, 📊 for Dashboard).
-  - Updated the search placeholder to be more descriptive ("Search for products...").
-- **Preserved Functionality**:
-  - Kept all existing bindings and events (e.g., `(input)="search($event)"`, `(click)="navigateTo('/cart')"`) intact.
-  - Ensured the cart badge (`cartItemCount`) and dropdown toggle (`isDropdownOpen`) work as before.
+**Explanation**:
+- Removed the "Products" and "Deals" links for merchants using `*ngIf="!isMerchant"`.
+- Hid the search bar for merchants since they don’t need to search for products.
+- Updated the dropdown to use "Create Product" instead of "Add Product 🆕" for a more professional tone.
+- Removed all emojis to maintain a professional look.
 
-#### Test
-1. **Login as Customer**:
-   - The dropdown should show "Profile", "Update Profile", "Manage Addresses", "Place Order", "Order History", and "Logout".
-   - Cart link should be visible with the item count.
-2. **Login as Merchant**:
-   - The dropdown should show "Profile", "Update Profile", "Dashboard", "Add Product", "Manage Products", and "Logout".
-   - Cart link should not be visible.
-3. **Not Logged In**:
-   - Should see "Login" and "Signup" buttons.
-4. **Navigation**:
-   - Clicking any link (e.g., Home, Products) should close the dropdown.
-   - Search functionality should work as before.
+#### 2. Redirect Merchant Home Page to Dashboard
+Currently, the home page (`HomeComponent`) shows all products, which is customer-focused. For merchants, we’ll redirect the root path (`/`) to `/merchant-dashboard`.
 
-These changes enhance the navbar for merchants while preserving all previous functionality for customers and unauthenticated users. Let me know if you need further adjustments! 🚀
+**Changes to `app.routes.ts`**:
+We’ll add a route guard to redirect based on user role.
 
-
-
-
-
-Let’s implement the merchant functionality for your EShoppingZone application, focusing on creating a seamless and professional experience for merchants. Since you’ve shared the necessary backend files (`ProductController`, `ProductService`, and DTOs), I’ll leverage those to build the merchant features on the frontend. I’ll create a merchant dashboard, update the navbar for merchants, and ensure the experience is distinct from customers by limiting product visibility to the merchant’s own products. I’ll also design the merchant experience to be intuitive and robust, aiming for a top-notch implementation.
-
-### Plan for Merchant Implementation
-1. **Navbar for Merchants**:
-   - Update the `HeaderComponent` to show a merchant-specific dropdown with options like "Dashboard", "Add Product", "Manage Products", "Profile", and "Logout".
-   - Display the merchant’s first name in the dropdown (already implemented for customers).
-2. **Merchant Dashboard**:
-   - Create a `MerchantDashboardComponent` to show key stats (e.g., total products, total stock, average rating across products).
-   - Include quick links to "Add Product" and "Manage Products".
-3. **Add Product**:
-   - Create an `AddProductComponent` to allow merchants to add new products using the `POST /api/ProductController` endpoint.
-4. **Manage Products**:
-   - Create a `ManageProductsComponent` to list the merchant’s products (using `GET /api/ProductController/MerchantGetProdut`), with options to update or delete them.
-5. **Update Product**:
-   - Create an `UpdateProductComponent` to edit existing products using the `PUT /api/ProductController/UpdateProduct/{productId}` endpoint.
-6. **Product Visibility**:
-   - Ensure merchants only see their own products (already handled by `MerchantGetProdut` API) and not all products like customers do.
-
----
-
-### Implementation
-
-#### 1. Update Navbar for Merchants
-We’ll modify the `HeaderComponent` to show a merchant-specific dropdown when the user is a merchant.
-
-**Changes to `header.component.ts`**:
+**New File: `role-redirect.guard.ts`**:
 ```typescript
-// Add property to determine user role
-isMerchant: boolean = false;
+import { Injectable } from '@angular/core';
+import { CanActivate, Router } from '@angular/router';
+import { AuthService } from '../services/auth.service';
 
-// Update ngOnInit to set user role
-ngOnInit() {
-  this.router.events.subscribe(event => {
-    if (event instanceof NavigationEnd) {
-      this.closeDropdown();
+@Injectable({
+  providedIn: 'root'
+})
+export class RoleRedirectGuard implements CanActivate {
+  constructor(private authService: AuthService, private router: Router) {}
+
+  canActivate(): boolean {
+    if (this.authService.isLoggedIn() && this.authService.getUserRole() === 'Merchant') {
+      this.router.navigate(['/merchant-dashboard']);
+      return false;
     }
-  });
-
-  if (this.authService.isLoggedIn()) {
-    this.authService.viewProfile().subscribe({
-      next: (response) => {
-        if (response.success && response.data) {
-          this.firstName = response.data.fullName.split(' ')[0];
-        }
-      },
-      error: (err) => {
-        console.error('Error fetching profile:', err);
-        this.firstName = null;
-      }
-    });
-
-    this.cartService.cartUpdate$.subscribe(count => {
-      this.cartItemCount = count;
-    });
-
-    this.cartService.getCart().subscribe({
-      next: (response) => {
-        if (response.success && response.data) {
-          this.cartItemCount = response.data.items.reduce((sum, item) => sum + item.quantity, 0);
-        }
-      }
-    });
-
-    // Set user role
-    this.isMerchant = this.authService.getUserRole() === 'Merchant';
+    return true;
   }
 }
 ```
 
-**Changes to `header.component.html`**:
-```html
-<!-- Update dropdown to show merchant-specific options -->
-<div class="nav-item dropdown" (click)="toggleDropdown(); $event.preventDefault()">
-  <a class="nav-link dropdown-toggle text-white" id="profileDropdown" role="button" aria-expanded="false">
-    {{ firstName ? firstName : 'Profile' }}
-  </a>
-  <ul class="dropdown-menu" [ngClass]="{'show': isDropdownOpen}">
-    <li *ngIf="isMerchant">
-      <a class="dropdown-item" (click)="navigateTo('/merchant-dashboard')">Dashboard 📊</a>
-    </li>
-    <li *ngIf="isMerchant">
-      <a class="dropdown-item" (click)="navigateTo('/add-product')">Add Product 🆕</a>
-    </li>
-    <li *ngIf="isMerchant">
-      <a class="dropdown-item" (click)="navigateTo('/manage-products')">Manage Products 📦</a>
-    </li>
-    <li>
-      <a class="dropdown-item" (click)="navigateTo('/profile')">Profile 👤</a>
-    </li>
-    <li *ngIf="!isMerchant">
-      <a class="dropdown-item" (click)="navigateTo('/cart')">Cart 🛒</a>
-    </li>
-    <li>
-      <a class="dropdown-item" (click)="logout()">Logout 🚪</a>
-    </li>
-  </ul>
-</div>
+**Changes to `app.routes.ts`**:
+```typescript
+import { Routes } from '@angular/router';
+import { HomeComponent } from './components/home/home.component';
+import { LoginComponent } from './components/login/login.component';
+import { RegisterComponent } from './components/register/register.component';
+import { AuthGuard } from './guards/auth.guard';
+import { RoleRedirectGuard } from './guards/role-redirect.guard';
+import { ProductDetailComponent } from './components/product-detail/product-detail.component';
+import { CartComponent } from './components/cart/cart.component';
+import { ProfileComponent } from './components/profile/profile.component';
+import { UpdateProfileComponent } from './components/update-profile/update-profile.component';
+import { ManageAddressesComponent } from './components/manage-addresses/manage-addresses.component';
+import { MerchantDashboardComponent } from './components/merchant-dashboard/merchant-dashboard.component';
+import { AddProductComponent } from './components/add-product/add-product.component';
+import { ManageProductsComponent } from './components/manage-products/manage-products.component';
+import { UpdateProductComponent } from './components/update-product/update-product.component';
+
+export const routes: Routes = [
+  { path: '', component: HomeComponent, canActivate: [RoleRedirectGuard] },
+  { path: 'login', component: LoginComponent },
+  { path: 'register', component: RegisterComponent },
+  { path: 'product/:id', component: ProductDetailComponent },
+  { path: 'cart', component: CartComponent, canActivate: [AuthGuard] },
+  { path: 'profile', component: ProfileComponent, canActivate: [AuthGuard] },
+  { path: 'update-profile', component: UpdateProfileComponent, canActivate: [AuthGuard] },
+  { path: 'manage-addresses', component: ManageAddressesComponent, canActivate: [AuthGuard] },
+  { path: 'merchant-dashboard', component: MerchantDashboardComponent, canActivate: [AuthGuard] },
+  { path: 'add-product', component: AddProductComponent, canActivate: [AuthGuard] },
+  { path: 'manage-products', component: ManageProductsComponent, canActivate: [AuthGuard] },
+  { path: 'update-product/:id', component: UpdateProductComponent, canActivate: [AuthGuard] },
+  { path: '**', redirectTo: '' }
+];
 ```
 
 **Explanation**:
-- Added `isMerchant` to determine if the logged-in user is a merchant.
-- Updated the dropdown to show merchant-specific options ("Dashboard", "Add Product", "Manage Products") when `isMerchant` is true.
-- Kept "Profile" and "Logout" for all users, but hid "Cart" for merchants since they don’t need it.
+- Added `RoleRedirectGuard` to check if the user is a merchant. If so, redirects them to `/merchant-dashboard`.
+- Applied the guard to the root path (`/`) so merchants are automatically taken to their dashboard instead of the customer-focused `HomeComponent`.
 
-#### 2. Create Merchant Dashboard
-The dashboard will display key stats and provide quick navigation for merchants.
+#### 3. Redesign Merchant Dashboard
+We’ll redesign the `MerchantDashboardComponent` to be more professional, fix the average rating calculation, and add more relevant metrics (e.g., low stock products).
 
-**New File: `merchant-dashboard.component.ts`**:
+**Changes to `merchant-dashboard.component.ts`**:
 ```typescript
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -382,6 +240,7 @@ import { RouterLink } from '@angular/router';
 export class MerchantDashboardComponent implements OnInit {
   totalProducts: number = 0;
   totalStock: number = 0;
+  lowStockProducts: number = 0;
   averageRating: number = 0;
   errorMessage: string | null = null;
 
@@ -397,8 +256,12 @@ export class MerchantDashboardComponent implements OnInit {
         if (response.success && response.data) {
           this.totalProducts = response.data.length;
           this.totalStock = response.data.reduce((sum, product) => sum + product.stock, 0);
-          const totalRating = response.data.reduce((sum, product) => sum + product.averageRating, 0);
-          this.averageRating = response.data.length > 0 ? totalRating / response.data.length : 0;
+          this.lowStockProducts = response.data.filter(product => product.stock < 10).length; // Define low stock as < 10
+
+          // Calculate average rating, excluding products with no reviews
+          const reviewedProducts = response.data.filter(product => product.reviewCount > 0);
+          const totalRating = reviewedProducts.reduce((sum, product) => sum + product.averageRating, 0);
+          this.averageRating = reviewedProducts.length > 0 ? totalRating / reviewedProducts.length : 0;
         } else {
           this.errorMessage = response.message || 'No products found';
         }
@@ -412,267 +275,100 @@ export class MerchantDashboardComponent implements OnInit {
 }
 ```
 
-**New File: `merchant-dashboard.component.html`**:
+**Changes to `merchant-dashboard.component.html`**:
 ```html
 <div class="container py-5 px-5">
-  <h2 class="fw-bold mb-4">Merchant Dashboard 📊</h2>
+  <h2 class="fw-bold mb-4">Merchant Dashboard</h2>
   <div *ngIf="errorMessage" class="alert alert-danger" role="alert">
     {{ errorMessage }}
   </div>
 
+  <!-- Stats Overview -->
   <div class="row">
     <div class="col-md-4 mb-4">
-      <div class="card shadow text-center">
-        <div class="card-body">
-          <h5 class="card-title">Total Products</h5>
-          <p class="card-text display-4">{{ totalProducts }}</p>
+      <div class="card shadow-sm border-0">
+        <div class="card-body text-center">
+          <h5 class="card-title text-muted">Total Products</h5>
+          <p class="card-text display-5 fw-bold text-primary">{{ totalProducts }}</p>
         </div>
       </div>
     </div>
     <div class="col-md-4 mb-4">
-      <div class="card shadow text-center">
-        <div class="card-body">
-          <h5 class="card-title">Total Stock</h5>
-          <p class="card-text display-4">{{ totalStock }}</p>
+      <div class="card shadow-sm border-0">
+        <div class="card-body text-center">
+          <h5 class="card-title text-muted">Total Stock</h5>
+          <p class="card-text display-5 fw-bold text-primary">{{ totalStock }}</p>
         </div>
       </div>
     </div>
     <div class="col-md-4 mb-4">
-      <div class="card shadow text-center">
-        <div class="card-body">
-          <h5 class="card-title">Average Rating</h5>
-          <p class="card-text display-4">{{ averageRating | number:'1.1-1' }}</p>
+      <div class="card shadow-sm border-0">
+        <div class="card-body text-center">
+          <h5 class="card-title text-muted">Low Stock Products</h5>
+          <p class="card-text display-5 fw-bold text-warning">{{ lowStockProducts }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 mb-4">
+      <div class="card shadow-sm border-0">
+        <div class="card-body text-center">
+          <h5 class="card-title text-muted">Average Product Rating</h5>
+          <p class="card-text display-5 fw-bold text-success">{{ averageRating | number:'1.1-1' }}</p>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="mt-4">
-    <h4>Quick Actions</h4>
+  <!-- Quick Actions -->
+  <div class="mt-5">
+    <h4 class="fw-bold mb-3">Quick Actions</h4>
     <div class="d-flex gap-3">
-      <a [routerLink]="['/add-product']" class="btn btn-primary">Add New Product 🆕</a>
-      <a [routerLink]="['/manage-products']" class="btn btn-secondary">Manage Products 📦</a>
+      <a [routerLink]="['/add-product']" class="btn btn-primary">Create Product</a>
+      <a [routerLink]="['/manage-products']" class="btn btn-outline-primary">Manage Products</a>
     </div>
   </div>
 </div>
 ```
 
-**New File: `merchant-dashboard.component.css`**:
+**Changes to `merchant-dashboard.component.css`**:
 ```css
 .card {
-  border-radius: 10px;
+  border-radius: 8px;
+  transition: transform 0.2s;
 }
-.display-4 {
-  font-size: 2.5rem;
-  font-weight: bold;
+.card:hover {
+  transform: translateY(-5px);
 }
-```
-
-#### 3. Add Product
-Allow merchants to add new products using the `POST /api/ProductController` endpoint.
-
-**Update `product.service.ts`** (if not already present):
-```typescript
-import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
-
-export interface ProductRequest {
-  name: string;
-  type?: string;
-  category?: string;
-  price: number;
-  stock: number;
-  description?: string;
-  images?: string;
-  specifications?: string;
+.display-5 {
+  font-size: 2.2rem;
 }
-
-export interface UpdateProductRequest {
-  name?: string;
-  type?: string;
-  category?: string;
-  price: number;
-  stock: number;
-  description?: string;
-  images?: string;
-  specifications?: string;
+.text-primary {
+  color: #007bff !important;
 }
-
-export interface ProductResponse {
-  id: number;
-  name: string;
-  type?: string;
-  category?: string;
-  price: number;
-  stock: number;
-  averageRating: number;
-  reviewCount: number;
-  description?: string;
-  images?: string;
-  specifications?: string;
+.text-warning {
+  color: #ffca2c !important;
 }
-
-export interface ResponseDTO<T> {
-  success: boolean;
-  message: string;
-  data?: T;
+.text-success {
+  color: #28a745 !important;
 }
-
-@Injectable({
-  providedIn: 'root'
-})
-export class ProductService {
-  private baseUrl = 'https://api.eshoppingzone.com';
-
-  constructor(private http: HttpClient) {}
-
-  addProduct(productRequest: ProductRequest): Observable<ResponseDTO<ProductResponse>> {
-    return this.http.post<ResponseDTO<ProductResponse>>(`${this.baseUrl}/api/ProductController`, productRequest);
-  }
-
-  getMerchantProducts(): Observable<ResponseDTO<ProductResponse[]>> {
-    return this.http.get<ResponseDTO<ProductResponse[]>>(`${this.baseUrl}/api/ProductController/MerchantGetProdut`);
-  }
-
-  getProduct(productId: number): Observable<ResponseDTO<ProductResponse>> {
-    return this.http.get<ResponseDTO<ProductResponse>>(`${this.baseUrl}/api/ProductController/GetProduct/${productId}`);
-  }
-
-  getAllProducts(): Observable<ResponseDTO<ProductResponse[]>> {
-    return this.http.get<ResponseDTO<ProductResponse[]>>(`${this.baseUrl}/api/ProductController/GetAllProducts`);
-  }
-
-  updateProduct(productId: number, updateRequest: UpdateProductRequest): Observable<ResponseDTO<ProductResponse>> {
-    return this.http.put<ResponseDTO<ProductResponse>>(`${this.baseUrl}/api/ProductController/UpdateProduct/${productId}`, updateRequest);
-  }
-
-  deleteProduct(productId: number): Observable<ResponseDTO<ProductResponse>> {
-    return this.http.delete<ResponseDTO<ProductResponse>>(`${this.baseUrl}/api/ProductController/DeleteProduct/${productId}`);
-  }
-}
-```
-
-**New File: `add-product.component.ts`**:
-```typescript
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { ProductService, ProductRequest } from '../../services/product.service';
-import { Router } from '@angular/router';
-
-@Component({
-  selector: 'app-add-product',
-  standalone: true,
-  imports: [CommonModule, FormsModule],
-  templateUrl: './add-product.component.html',
-  styleUrls: ['./add-product.component.css']
-})
-export class AddProductComponent {
-  product: ProductRequest = {
-    name: '',
-    type: '',
-    category: '',
-    price: 0,
-    stock: 0,
-    description: '',
-    images: '',
-    specifications: ''
-  };
-  errorMessage: string | null = null;
-  successMessage: string | null = null;
-
-  constructor(private productService: ProductService, private router: Router) {}
-
-  addProduct() {
-    this.productService.addProduct(this.product).subscribe({
-      next: (response) => {
-        if (response.success) {
-          this.successMessage = 'Product added successfully!';
-          this.errorMessage = null;
-          setTimeout(() => {
-            this.router.navigate(['/manage-products']);
-          }, 2000);
-        } else {
-          this.errorMessage = response.message || 'Failed to add product';
-          this.successMessage = null;
-        }
-      },
-      error: (err) => {
-        this.errorMessage = 'Error adding product';
-        console.error(err);
-      }
-    });
-  }
-}
-```
-
-**New File: `add-product.component.html`**:
-```html
-<div class="container py-5 px-5">
-  <h2 class="fw-bold mb-4">Add New Product 🆕</h2>
-  <div *ngIf="errorMessage" class="alert alert-danger" role="alert">
-    {{ errorMessage }}
-  </div>
-  <div *ngIf="successMessage" class="alert alert-success" role="alert">
-    {{ successMessage }}
-  </div>
-  <div class="card shadow">
-    <div class="card-body">
-      <form (ngSubmit)="addProduct()">
-        <div class="mb-3">
-          <label for="name" class="form-label">Product Name</label>
-          <input type="text" class="form-control" id="name" [(ngModel)]="product.name" name="name" required maxlength="100">
-        </div>
-        <div class="mb-3">
-          <label for="type" class="form-label">Type (Optional)</label>
-          <input type="text" class="form-control" id="type" [(ngModel)]="product.type" name="type" maxlength="50">
-        </div>
-        <div class="mb-3">
-          <label for="category" class="form-label">Category (Optional)</label>
-          <input type="text" class="form-control" id="category" [(ngModel)]="product.category" name="category" maxlength="50">
-        </div>
-        <div class="mb-3">
-          <label for="price" class="form-label">Price</label>
-          <input type="number" class="form-control" id="price" [(ngModel)]="product.price" name="price" required min="0.01" step="0.01">
-        </div>
-        <div class="mb-3">
-          <label for="stock" class="form-label">Stock</label>
-          <input type="number" class="form-control" id="stock" [(ngModel)]="product.stock" name="stock" required min="0">
-        </div>
-        <div class="mb-3">
-          <label for="description" class="form-label">Description (Optional)</label>
-          <textarea class="form-control" id="description" [(ngModel)]="product.description" name="description" maxlength="5000"></textarea>
-        </div>
-        <div class="mb-3">
-          <label for="images" class="form-label">Images URL (Optional)</label>
-          <input type="text" class="form-control" id="images" [(ngModel)]="product.images" name="images">
-        </div>
-        <div class="mb-3">
-          <label for="specifications" class="form-label">Specifications (Optional)</label>
-          <input type="text" class="form-control" id="specifications" [(ngModel)]="product.specifications" name="specifications">
-        </div>
-        <button type="submit" class="btn btn-primary w-100">Add Product</button>
-      </form>
-    </div>
-  </div>
-</div>
-```
-
-**New File: `add-product.component.css`**:
-```css
-.card {
-  border-radius: 10px;
-}
-.form-control {
+.btn {
   border-radius: 5px;
 }
 ```
 
-#### 4. Manage Products
-Allow merchants to view, update, and delete their products using `GET /api/ProductController/MerchantGetProdut`, `PUT /api/ProductController/UpdateProduct/{productId}`, and `DELETE /api/ProductController/DeleteProduct/{productId}`.
+**Explanation**:
+- **Average Rating Fix**: Excluded products with `reviewCount == 0` when calculating the average rating.
+- **New Metric**: Added `lowStockProducts` to show products with stock below 10, helping merchants identify items needing restocking.
+- **Professional Design**:
+  - Used a clean card layout with subtle shadows and hover effects.
+  - Added color coding for metrics (blue for total products/stock, yellow for low stock, green for average rating).
+  - Removed emojis and used professional labels (e.g., "Create Product" instead of "Add New Product 🆕").
+  - Adjusted font sizes and spacing for a polished look.
 
-**New File: `manage-products.component.ts`**:
+#### 4. Enhance Manage Products
+We’ll add an "Add Product" button, display product images, and allow merchants to click a product to view its details with an edit option.
+
+**Changes to `manage-products.component.ts`**:
 ```typescript
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -732,100 +428,108 @@ export class ManageProductsComponent implements OnInit {
 }
 ```
 
-**New File: `manage-products.component.html`**:
+**Changes to `manage-products.component.html`**:
 ```html
 <div class="container py-5 px-5">
-  <h2 class="fw-bold mb-4">Manage Products 📦</h2>
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold">Manage Products</h2>
+    <a [routerLink]="['/add-product']" class="btn btn-primary">Create Product</a>
+  </div>
   <div *ngIf="errorMessage" class="alert alert-danger" role="alert">
     {{ errorMessage }}
   </div>
   <div *ngIf="products.length > 0; else noProducts">
-    <div class="card mb-4 shadow-sm" *ngFor="let product of products">
-      <div class="card-body">
-        <h5 class="card-title">{{ product.name }}</h5>
-        <p class="card-text">Price: {{ product.price | currency }}</p>
-        <p class="card-text">Stock: {{ product.stock }}</p>
-        <p class="card-text">Category: {{ product.category || 'Not specified' }}</p>
-        <p class="card-text">Average Rating: {{ product.averageRating | number:'1.1-1' }} ({{ product.reviewCount }} reviews)</p>
-        <div class="d-flex gap-2">
-          <a [routerLink]="['/update-product', product.id]" class="btn btn-primary">Update</a>
-          <button class="btn btn-danger" (click)="deleteProduct(product.id)">Delete</button>
+    <div class="row">
+      <div class="col-md-4 mb-4" *ngFor="let product of products">
+        <div class="card shadow-sm border-0 h-100">
+          <img *ngIf="product.images" [src]="product.images" class="card-img-top" alt="{{ product.name }}" style="height: 200px; object-fit: cover;">
+          <div *ngIf="!product.images" class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
+            <span class="text-muted">No Image</span>
+          </div>
+          <div class="card-body">
+            <h5 class="card-title">{{ product.name }}</h5>
+            <p class="card-text text-muted">Price: {{ product.price | currency }}</p>
+            <p class="card-text text-muted">Stock: {{ product.stock }}</p>
+            <p class="card-text text-muted">Category: {{ product.category || 'Not specified' }}</p>
+            <p class="card-text text-muted">Rating: {{ product.averageRating | number:'1.1-1' }} ({{ product.reviewCount }} reviews)</p>
+            <div class="d-flex gap-2">
+              <a [routerLink]="['/merchant-product-detail', product.id]" class="btn btn-outline-primary btn-sm">View Details</a>
+              <a [routerLink]="['/update-product', product.id]" class="btn btn-outline-secondary btn-sm">Edit</a>
+              <button class="btn btn-outline-danger btn-sm" (click)="deleteProduct(product.id)">Delete</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
   <ng-template #noProducts>
-    <p class="text-muted text-center">No products found. Add a new product to get started!</p>
+    <p class="text-muted text-center">No products found. Create a new product to get started.</p>
   </ng-template>
 </div>
 ```
 
-**New File: `manage-products.component.css`**:
+**Changes to `manage-products.component.css`**:
 ```css
 .card {
-  border-radius: 10px;
+  border-radius: 8px;
+  transition: transform 0.2s;
+}
+.card:hover {
+  transform: translateY(-5px);
+}
+.card-img-top {
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
 }
 ```
 
-#### 5. Update Product
-Allow merchants to edit their products.
+**Explanation**:
+- **Add Product Button**: Added a "Create Product" button at the top right of the page.
+- **Product Images**: Displayed the product image using the `images` field from `ProductResponse`. If no image exists, a placeholder is shown.
+- **Grid Layout**: Used a Bootstrap grid (`col-md-4`) to display products in a responsive 3-column layout.
+- **View Details Link**: Added a "View Details" button linking to a new `MerchantProductDetailComponent`.
+- **Professional Design**: Used subtle shadows, hover effects, and smaller buttons (`btn-sm`) for a cleaner look.
 
-**New File: `update-product.component.ts`**:
+#### 5. Create Merchant Product Detail Page
+Create a new `MerchantProductDetailComponent` to allow merchants to view detailed product information and edit if needed.
+
+**New File: `merchant-product-detail.component.ts`**:
 ```typescript
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { ProductService, UpdateProductRequest, ProductResponse } from '../../services/product.service';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ProductService, ProductResponse } from '../../services/product.service';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 
 @Component({
-  selector: 'app-update-product',
+  selector: 'app-merchant-product-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule],
-  templateUrl: './update-product.component.html',
-  styleUrls: ['./update-product.component.css']
+  imports: [CommonModule, RouterLink],
+  templateUrl: './merchant-product-detail.component.html',
+  styleUrls: ['./merchant-product-detail.component.css']
 })
-export class UpdateProductComponent implements OnInit {
-  productId: number = 0;
-  product: UpdateProductRequest = {
-    name: '',
-    type: '',
-    category: '',
-    price: 0,
-    stock: 0,
-    description: '',
-    images: '',
-    specifications: ''
-  };
+export class MerchantProductDetailComponent implements OnInit {
+  product: ProductResponse | null = null;
   errorMessage: string | null = null;
-  successMessage: string | null = null;
 
   constructor(
     private productService: ProductService,
-    private route: ActivatedRoute,
-    private router: Router
+    private route: ActivatedRoute
   ) {}
 
   ngOnInit() {
-    this.productId = Number(this.route.snapshot.paramMap.get('id'));
-    this.loadProduct();
+    const productId = Number(this.route.snapshot.paramMap.get('id'));
+    this.loadProduct(productId);
   }
 
-  loadProduct() {
-    this.productService.getProduct(this.productId).subscribe({
+  loadProduct(productId: number) {
+    this.productService.getProduct(productId).subscribe({
       next: (response) => {
         if (response.success && response.data) {
-          const product = response.data;
-          this.product = {
-            name: product.name,
-            type: product.type,
-            category: product.category,
-            price: product.price,
-            stock: product.stock,
-            description: product.description,
-            images: product.images,
-            specifications: product.specifications
-          };
+          this.product = response.data;
         } else {
           this.errorMessage = response.message || 'Product not found';
         }
@@ -836,102 +540,67 @@ export class UpdateProductComponent implements OnInit {
       }
     });
   }
-
-  updateProduct() {
-    this.productService.updateProduct(this.productId, this.product).subscribe({
-      next: (response) => {
-        if (response.success) {
-          this.successMessage = 'Product updated successfully!';
-          this.errorMessage = null;
-          setTimeout(() => {
-            this.router.navigate(['/manage-products']);
-          }, 2000);
-        } else {
-          this.errorMessage = response.message || 'Failed to update product';
-          this.successMessage = null;
-        }
-      },
-      error: (err) => {
-        this.errorMessage = 'Error updating product';
-        console.error(err);
-      }
-    });
-  }
 }
 ```
 
-**New File: `update-product.component.html`**:
+**New File: `merchant-product-detail.component.html`**:
 ```html
 <div class="container py-5 px-5">
-  <h2 class="fw-bold mb-4">Update Product ✏️</h2>
+  <h2 class="fw-bold mb-4">Product Details</h2>
   <div *ngIf="errorMessage" class="alert alert-danger" role="alert">
     {{ errorMessage }}
   </div>
-  <div *ngIf="successMessage" class="alert alert-success" role="alert">
-    {{ successMessage }}
-  </div>
-  <div class="card shadow">
-    <div class="card-body">
-      <form (ngSubmit)="updateProduct()">
-        <div class="mb-3">
-          <label for="name" class="form-label">Product Name</label>
-          <input type="text" class="form-control" id="name" [(ngModel)]="product.name" name="name" maxlength="100">
+  <div *ngIf="product" class="card shadow-sm border-0">
+    <div class="row g-0">
+      <div class="col-md-4">
+        <img *ngIf="product.images" [src]="product.images" class="img-fluid rounded-start" alt="{{ product.name }}" style="height: 100%; object-fit: cover;">
+        <div *ngIf="!product.images" class="bg-light d-flex align-items-center justify-content-center" style="height: 100%;">
+          <span class="text-muted">No Image</span>
         </div>
-        <div class="mb-3">
-          <label for="type" class="form-label">Type</label>
-          <input type="text" class="form-control" id="type" [(ngModel)]="product.type" name="type" maxlength="50">
+      </div>
+      <div class="col-md-8">
+        <div class="card-body">
+          <h3 class="card-title">{{ product.name }}</h3>
+          <p class="card-text"><strong>Price:</strong> {{ product.price | currency }}</p>
+          <p class="card-text"><strong>Stock:</strong> {{ product.stock }}</p>
+          <p class="card-text"><strong>Category:</strong> {{ product.category || 'Not specified' }}</p>
+          <p class="card-text"><strong>Type:</strong> {{ product.type || 'Not specified' }}</p>
+          <p class="card-text"><strong>Average Rating:</strong> {{ product.averageRating | number:'1.1-1' }} ({{ product.reviewCount }} reviews)</p>
+          <p class="card-text"><strong>Description:</strong> {{ product.description || 'No description provided' }}</p>
+          <p class="card-text"><strong>Specifications:</strong> {{ product.specifications || 'No specifications provided' }}</p>
+          <div class="mt-4">
+            <a [routerLink]="['/update-product', product.id]" class="btn btn-primary me-2">Edit Product</a>
+            <a [routerLink]="['/manage-products']" class="btn btn-outline-secondary">Back to Manage Products</a>
+          </div>
         </div>
-        <div class="mb-3">
-          <label for="category" class="form-label">Category</label>
-          <input type="text" class="form-control" id="category" [(ngModel)]="product.category" name="category" maxlength="50">
-        </div>
-        <div class="mb-3">
-          <label for="price" class="form-label">Price</label>
-          <input type="number" class="form-control" id="price" [(ngModel)]="product.price" name="price" required min="0.01" step="0.01">
-        </div>
-        <div class="mb-3">
-          <label for="stock" class="form-label">Stock</label>
-          <input type="number" class="form-control" id="stock" [(ngModel)]="product.stock" name="stock" required min="0">
-        </div>
-        <div class="mb-3">
-          <label for="description" class="form-label">Description</label>
-          <textarea class="form-control" id="description" [(ngModel)]="product.description" name="description" maxlength="500"></textarea>
-        </div>
-        <div class="mb-3">
-          <label for="images" class="form-label">Images URL</label>
-          <input type="text" class="form-control" id="images" [(ngModel)]="product.images" name="images">
-        </div>
-        <div class="mb-3">
-          <label for="specifications" class="form-label">Specifications</label>
-          <input type="text" class="form-control" id="specifications" [(ngModel)]="product.specifications" name="specifications" maxlength="500">
-        </div>
-        <button type="submit" class="btn btn-primary w-100">Update Product</button>
-      </form>
+      </div>
     </div>
   </div>
 </div>
 ```
 
-**New File: `update-product.component.css`**:
+**New File: `merchant-product-detail.component.css`**:
 ```css
 .card {
-  border-radius: 10px;
+  border-radius: 8px;
 }
-.form-control {
-  border-radius: 5px;
+.img-fluid {
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+.card-body {
+  padding: 2rem;
 }
 ```
 
-#### 6. Update Routes
-Add routes for the new components in `app.routes.ts`.
-
-**Changes to `app.routes.ts`**:
+**Add Route in `app.routes.ts`**:
 ```typescript
 import { Routes } from '@angular/router';
 import { HomeComponent } from './components/home/home.component';
 import { LoginComponent } from './components/login/login.component';
 import { RegisterComponent } from './components/register/register.component';
 import { AuthGuard } from './guards/auth.guard';
+import { RoleRedirectGuard } from './guards/role-redirect.guard';
 import { ProductDetailComponent } from './components/product-detail/product-detail.component';
 import { CartComponent } from './components/cart/cart.component';
 import { ProfileComponent } from './components/profile/profile.component';
@@ -941,9 +610,10 @@ import { MerchantDashboardComponent } from './components/merchant-dashboard/merc
 import { AddProductComponent } from './components/add-product/add-product.component';
 import { ManageProductsComponent } from './components/manage-products/manage-products.component';
 import { UpdateProductComponent } from './components/update-product/update-product.component';
+import { MerchantProductDetailComponent } from './components/merchant-product-detail/merchant-product-detail.component';
 
 export const routes: Routes = [
-  { path: '', component: HomeComponent },
+  { path: '', component: HomeComponent, canActivate: [RoleRedirectGuard] },
   { path: 'login', component: LoginComponent },
   { path: 'register', component: RegisterComponent },
   { path: 'product/:id', component: ProductDetailComponent },
@@ -955,45 +625,54 @@ export const routes: Routes = [
   { path: 'add-product', component: AddProductComponent, canActivate: [AuthGuard] },
   { path: 'manage-products', component: ManageProductsComponent, canActivate: [AuthGuard] },
   { path: 'update-product/:id', component: UpdateProductComponent, canActivate: [AuthGuard] },
+  { path: 'merchant-product-detail/:id', component: MerchantProductDetailComponent, canActivate: [AuthGuard] },
   { path: '**', redirectTo: '' }
 ];
 ```
 
-#### 7. Product Visibility for Merchants
-Merchants should only see their own products, which is already handled by the `GET /api/ProductController/MerchantGetProdut` endpoint used in `ManageProductsComponent` and `MerchantDashboardComponent`. Customers, on the other hand, use `GET /api/ProductController/GetAllProducts` in `HomeComponent` to see all products. This distinction is already implemented correctly.
+**Explanation**:
+- Created `MerchantProductDetailComponent` to display detailed product information.
+- Included an image on the left and product details on the right for a professional layout.
+- Added buttons to edit the product or return to the manage products page.
 
 ---
 
-### Summary of Implementation
-- **Navbar for Merchants**:
-  - Updated `HeaderComponent` to show a merchant-specific dropdown with "Dashboard", "Add Product", "Manage Products", "Profile", and "Logout".
-  - Hid the "Cart" option for merchants.
+### Summary of Changes
+- **Navbar**:
+  - Removed "Products" and "Deals" links for merchants.
+  - Hid the search bar for merchants.
+  - Updated the dropdown to use professional labels ("Create Product").
+- **Home Page**:
+  - Redirected merchants to `/merchant-dashboard` using `RoleRedirectGuard`.
 - **Merchant Dashboard**:
-  - Created `MerchantDashboardComponent` to display stats (total products, total stock, average rating) and quick links to add and manage products.
-- **Add Product**:
-  - Created `AddProductComponent` to allow merchants to add new products with a form matching the `ProductRequest` DTO.
+  - Fixed average rating to exclude products with no reviews.
+  - Added "Low Stock Products" metric.
+  - Redesigned with a professional card layout, color-coded metrics, and no emojis.
 - **Manage Products**:
-  - Created `ManageProductsComponent` to list the merchant’s products with options to update or delete them.
-- **Update Product**:
-  - Created `UpdateProductComponent` to allow merchants to edit existing products.
-- **Product Visibility**:
-  - Ensured merchants only see their own products via `MerchantGetProdut` API, while customers see all products via `GetAllProducts`.
+  - Added a "Create Product" button.
+  - Displayed product images.
+  - Used a grid layout for a cleaner presentation.
+  - Added a "View Details" link to navigate to the new `MerchantProductDetailComponent`.
+- **Merchant Product Detail**:
+  - Created a detailed view for products with an option to edit.
+- **Professional Tone**:
+  - Removed all emojis and used professional terminology throughout.
 
 ---
 
 ### Test
 1. **Login as Merchant**:
-   - Log in with a merchant account.
-   - The navbar dropdown should show "Dashboard", "Add Product", "Manage Products", "Profile", and "Logout".
+   - Navbar should only show "Home" (redirects to dashboard).
+   - Dropdown should show "Profile", "Update Profile", "Dashboard", "Create Product", "Manage Products", "Logout".
 2. **Merchant Dashboard**:
-   - Navigate to `/merchant-dashboard`—should show total products, total stock, and average rating.
-   - Click "Add New Product" or "Manage Products" to navigate to those pages.
-3. **Add Product**:
-   - Go to `/add-product`, fill in the form, and submit—should redirect to `/manage-products` after success.
-4. **Manage Products**:
-   - Go to `/manage-products`—should list only the merchant’s products.
-   - Click "Update" to edit a product, or "Delete" to remove it (with confirmation).
-5. **Update Product**:
-   - Go to `/update-product/:id`, edit the product details, and submit—should redirect to `/manage-products` after success.
+   - Should show total products, total stock, low stock products, and average rating (excluding unreviewed products).
+   - Layout should look clean and professional.
+3. **Manage Products**:
+   - Should display products in a grid with images.
+   - Should have a "Create Product" button at the top.
+   - Clicking "View Details" should take you to the product detail page.
+4. **Merchant Product Detail**:
+   - Should show all product details with an image.
+   - Should have an "Edit Product" button linking to `/update-product/:id`.
 
-This implementation provides a robust and merchant-focused experience, leveraging your backend APIs effectively. Let me know if you’d like to refine anything further! 🚀
+This implementation provides a professional and merchant-focused experience. Let me know if you’d like further refinements! 🚀
