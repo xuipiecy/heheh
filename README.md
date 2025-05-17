@@ -836,3 +836,351 @@ These changes provide a professional and efficient merchant experience. Let’s 
 - In `ManageProducts`, click a product to see the detailed view with an image gallery and reviews.
 
 Let me know if you need to adjust anything further! 🚀
+
+
+
+Let’s address your concern about avoiding the creation of a separate `filter-low-stock.pipe.ts` file and instead find an alternative within the existing components. We’ll revisit the last response, identify the changes made, and modify the approach for the low stock filter to keep everything in the `MerchantDashboardComponent`. Then, I’ll summarize the changes from the last response and highlight what needs to be adjusted.
+
+---
+
+### Addressing the Separate Pipe File
+In the last response, I suggested creating a `FilterLowStockPipe` to filter products with stock less than 100 for the "Low Stock Products" section in the `MerchantDashboardComponent`. You don’t want to create a separate file, so let’s explore an alternative: we can move the filtering logic directly into the `MerchantDashboardComponent` by either adding a method or a computed property to filter low stock products.
+
+#### Alternative to `FilterLowStockPipe`
+Instead of a pipe, we’ll add a method in `MerchantDashboardComponent` to filter low stock products and use it directly in the template. This keeps the logic within the component and avoids creating a new file.
+
+---
+
+### Revisiting the Last Response: Changes Made
+Let’s break down the changes from the last response to understand what was done and what needs to be adjusted:
+
+1. **Navbar Updates (`HeaderComponent`)**:
+   - Moved "Dashboard" and "Manage Products" to the navbar for merchants.
+   - Removed "Add Product" from the dropdown.
+
+2. **Merchant Dashboard Enhancements (`MerchantDashboardComponent`)**:
+   - Made stats clickable ("Total Products", "Total Stock", "Low Stock Products", "Average Product Rating").
+   - **Total Products**: Navigates to `/manage-products`.
+   - **Total Stock**: Shows a table with product names and stock.
+   - **Low Stock Products**: Shows products with stock < 100 (this is where the pipe was used).
+   - **Average Product Rating**: Shows product names and average ratings, with "No ratings so far" for unrated products.
+   - Removed the "Quick Actions" section.
+
+3. **Merchant Home Page (`MerchantHomeComponent`)**:
+   - Created a new `MerchantHomeComponent` with a banner and quick actions.
+   - Moved "Quick Actions" from the dashboard to this page, renamed "Create Product" to "Add Product", and added more options ("View Dashboard", "Update Profile").
+   - Updated `app.routes.ts` to include the `/merchant-home` route.
+   - Updated `RoleGuard` to redirect merchants to `/merchant-home`.
+
+4. **Manage Products (`ManageProductsComponent`)**:
+   - Made product cards clickable to navigate to `MerchantProductDetailComponent`.
+   - Removed the "View Details" button.
+   - Updated labels to "Add Product".
+
+5. **Merchant Product Detail (`MerchantProductDetailComponent`)**:
+   - Added an image gallery (similar to `ProductDetailComponent`).
+   - Added a reviews section with ratings and comments.
+   - Assumed a new `getProductReviews` method in `ProductService`.
+
+6. **Filter Low Stock Pipe**:
+   - Created `filter-low-stock.pipe.ts` to filter products with stock < 100.
+   - Imported the pipe into `MerchantDashboardComponent`.
+
+Since you’ve copied the files up to the creation of the `filter-low-stock.pipe.ts`, the pipe hasn’t been implemented yet, and we need to adjust the `MerchantDashboardComponent` to handle the low stock filtering without a separate pipe.
+
+---
+
+### Changes Needed: Adjusting `MerchantDashboardComponent`
+We’ll modify `MerchantDashboardComponent` to include a method for filtering low stock products and update the template to use this method instead of the pipe. Here’s how we’ll do it:
+
+#### Update `MerchantDashboardComponent` (Remove Pipe Dependency)
+**Changes to `merchant-dashboard.component.ts`**:
+```typescript
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ProductService, ProductResponse } from '../../services/product.service';
+import { RouterLink, Router } from '@angular/router';
+
+@Component({
+  selector: 'app-merchant-dashboard',
+  standalone: true,
+  imports: [CommonModule, RouterLink], // Removed FilterLowStockPipe
+  templateUrl: './merchant-dashboard.component.html',
+  styleUrls: ['./merchant-dashboard.component.css']
+})
+export class MerchantDashboardComponent implements OnInit {
+  totalProducts: number = 0;
+  totalStock: number = 0;
+  lowStockProducts: number = 0;
+  averageRating: number = 0;
+  errorMessage: string | null = null;
+  products: ProductResponse[] = [];
+  showTotalStock: boolean = false;
+  showLowStock: boolean = false;
+  showAverageRating: boolean = false;
+
+  constructor(private productService: ProductService, private router: Router) {}
+
+  ngOnInit() {
+    this.loadStats();
+  }
+
+  loadStats() {
+    this.productService.getMerchantProducts().subscribe({
+      next: (response) => {
+        if (response.success && response.data) {
+          this.products = response.data;
+          this.totalProducts = response.data.length;
+          this.totalStock = response.data.reduce((sum, product) => sum + product.stock, 0);
+          this.lowStockProducts = this.getLowStockProducts().length; // Use method to calculate low stock count
+
+          const reviewedProducts = response.data.filter(product => product.reviewCount > 0);
+          const totalRating = reviewedProducts.reduce((sum, product) => sum + product.averageRating, 0);
+          this.averageRating = reviewedProducts.length > 0 ? totalRating / reviewedProducts.length : 0;
+        } else {
+          this.errorMessage = response.message || 'No products found';
+        }
+      },
+      error: (err) => {
+        this.errorMessage = 'Error loading stats';
+        console.error(err);
+      }
+    });
+  }
+
+  // Method to filter low stock products
+  getLowStockProducts(): ProductResponse[] {
+    return this.products.filter(product => product.stock < 100);
+  }
+
+  onTotalProductsClick() {
+    this.router.navigate(['/manage-products']);
+  }
+
+  onTotalStockClick() {
+    this.showTotalStock = !this.showTotalStock;
+    this.showLowStock = false;
+    this.showAverageRating = false;
+  }
+
+  onLowStockClick() {
+    this.showLowStock = !this.showLowStock;
+    this.showTotalStock = false;
+    this.showAverageRating = false;
+  }
+
+  onAverageRatingClick() {
+    this.showAverageRating = !this.showAverageRating;
+    this.showTotalStock = false;
+    this.showLowStock = false;
+  }
+}
+```
+
+**Changes to `merchant-dashboard.component.html`**:
+```html
+<div class="container py-5 px-5">
+  <h2 class="fw-bold mb-4">Merchant Dashboard</h2>
+  <div *ngIf="errorMessage" class="alert alert-danger" role="alert">
+    {{ errorMessage }}
+  </div>
+
+  <!-- Stats Overview -->
+  <div class="row">
+    <div class="col-md-4 mb-4">
+      <div class="card shadow-sm border-0 clickable" (click)="onTotalProductsClick()">
+        <div class="card-body text-center">
+          <h5 class="card-title text-muted">Total Products</h5>
+          <p class="card-text display-5 fw-bold text-primary">{{ totalProducts }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 mb-4">
+      <div class="card shadow-sm border-0 clickable" (click)="onTotalStockClick()">
+        <div class="card-body text-center">
+          <h5 class="card-title text-muted">Total Stock</h5>
+          <p class="card-text display-5 fw-bold text-primary">{{ totalStock }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 mb-4">
+      <div class="card shadow-sm border-0 clickable" (click)="onLowStockClick()">
+        <div class="card-body text-center">
+          <h5 class="card-title text-muted">Low Stock Products</h5>
+          <p class="card-text display-5 fw-bold text-warning">{{ lowStockProducts }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 mb-4">
+      <div class="card shadow-sm border-0 clickable" (click)="onAverageRatingClick()">
+        <div class="card-body text-center">
+          <h5 class="card-title text-muted">Average Product Rating</h5>
+          <p class="card-text display-5 fw-bold text-success">{{ averageRating | number:'1.1-1' }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Total Stock Details -->
+  <div *ngIf="showTotalStock" class="mt-4">
+    <h4 class="fw-bold mb-3">Total Stock Details</h4>
+    <table class="table table-bordered table-hover shadow-sm">
+      <thead class="table-primary">
+        <tr>
+          <th>Product Name</th>
+          <th>Stock</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let product of products">
+          <td>{{ product.name }}</td>
+          <td>{{ product.stock }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Low Stock Details -->
+  <div *ngIf="showLowStock" class="mt-4">
+    <h4 class="fw-bold mb-3">Low Stock Products (Stock < 100)</h4>
+    <table class="table table-bordered table-hover shadow-sm">
+      <thead class="table-warning">
+        <tr>
+          <th>Product Name</th>
+          <th>Stock Remaining</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let product of getLowStockProducts()"> <!-- Use method instead of pipe -->
+          <td>{{ product.name }}</td>
+          <td>{{ product.stock }}</td>
+        </tr>
+        <tr *ngIf="getLowStockProducts().length === 0">
+          <td colspan="2" class="text-center text-muted">No products with low stock.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Average Rating Details -->
+  <div *ngIf="showAverageRating" class="mt-4">
+    <h4 class="fw-bold mb-3">Product Ratings</h4>
+    <table class="table table-bordered table-hover shadow-sm">
+      <thead class="table-success">
+        <tr>
+          <th>Product Name</th>
+          <th>Average Rating</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let product of products">
+          <td>{{ product.name }}</td>
+          <td>{{ product.reviewCount > 0 ? (product.averageRating | number:'1.1-1') : 'No ratings so far' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+```
+
+**Explanation of Changes**:
+- **Added `getLowStockProducts` Method**:
+  - Created a method in the component to filter products with stock < 100.
+  - Used this method in `loadStats` to calculate `lowStockProducts` and in the template to display the low stock table.
+- **Removed Pipe Dependency**:
+  - Removed the import of `FilterLowStockPipe` from the component’s `imports`.
+  - Replaced the pipe usage (`products | filterLowStock`) with the method call (`getLowStockProducts()`).
+- **Preserved Functionality**:
+  - The low stock section still shows products with stock < 100, and the table displays the product name and remaining stock.
+
+---
+
+### Things to Change from the Last Response
+Since you’ve copied files up to the creation of the pipe, the remaining changes from the last response (after the pipe creation) are still relevant, but they don’t depend on the pipe. Let’s summarize those changes and ensure they’re applied correctly:
+
+#### 1. **Create `MerchantHomeComponent`**
+You need to create the `MerchantHomeComponent` as the new landing page for merchants. This includes:
+- **File Creation**:
+  - `merchant-home.component.ts`
+  - `merchant-home.component.html`
+  - `merchant-home.component.css`
+- **Details**:
+  - A banner welcoming the merchant.
+  - Quick actions moved from the dashboard, with "Add Product" instead of "Create Product", and additional options like "View Dashboard" and "Update Profile".
+- **Status**: These files haven’t been created yet in your project, so you’ll need to copy them as provided in the last response.
+
+#### 2. **Update `app.routes.ts`**
+You need to add the `/merchant-home` route and ensure it’s protected for merchants.
+- **Change**:
+  - Add `{ path: 'merchant-home', component: MerchantHomeComponent, canActivate: [authGuard, RoleGuard], data: { expectedRole: 'Merchant' } }`.
+- **Status**: You’ll need to update your `app.routes.ts` with this route.
+
+#### 3. **Update `RoleGuard`**
+Modify `RoleGuard` to redirect merchants to `/merchant-home` instead of `/merchant-dashboard`.
+- **Change**:
+  - Update the redirect condition to navigate to `/merchant-home`.
+- **Status**: You’ll need to apply this change to your `role.guard.ts`.
+
+#### 4. **Update `ManageProductsComponent`**
+Make product cards clickable and remove the "View Details" button.
+- **Files**:
+  - `manage-products.component.html`
+  - `manage-products.component.css`
+- **Status**: You’ll need to apply these changes to your `ManageProductsComponent`.
+
+#### 5. **Update `MerchantProductDetailComponent`**
+Add the image gallery and reviews section.
+- **Files**:
+  - `merchant-product-detail.component.ts`
+  - `merchant-product-detail.component.html`
+  - `merchant-product-detail.component.css`
+- **Additional Requirement**:
+  - Assumed a `getProductReviews` method in `ProductService`. You’ll need to ensure your backend supports this endpoint or adjust the reviews fetching logic accordingly.
+- **Status**: You’ll need to apply these changes to your `MerchantProductDetailComponent`.
+
+#### 6. **Remove Pipe Dependency in `MerchantDashboardComponent`**
+This is the change we just made above, so you’re already set here.
+
+---
+
+### Summary of Actions
+You’ve copied the changes up to the creation of the pipe, so the following steps remain:
+
+1. **Apply the Updated `MerchantDashboardComponent`**:
+   - Use the modified `merchant-dashboard.component.ts` and `.html` above to handle low stock filtering without a pipe.
+   - No changes are needed for `merchant-dashboard.component.css` since it remains the same.
+
+2. **Create `MerchantHomeComponent`**:
+   - Copy the `merchant-home.component.ts`, `.html`, and `.css` files from the last response.
+   - These files create the new landing page for merchants with a banner and quick actions.
+
+3. **Update `app.routes.ts`**:
+   - Add the `/merchant-home` route as shown in the last response.
+   - Ensure all other routes remain consistent with your project.
+
+4. **Update `RoleGuard`**:
+   - Modify `role.guard.ts` to redirect merchants to `/merchant-home` as shown in the last response.
+
+5. **Update `ManageProductsComponent`**:
+   - Apply the changes to `manage-products.component.html` and `.css` to make product cards clickable and remove the "View Details" button.
+
+6. **Update `MerchantProductDetailComponent`**:
+   - Apply the changes to `merchant-product-detail.component.ts`, `.html`, and `.css` to add the image gallery and reviews.
+   - Ensure your `ProductService` has a method to fetch reviews, or adjust the logic if your backend doesn’t support this.
+
+---
+
+### Test Scenarios
+Let’s think about how to verify these changes work as expected:
+- **Merchant Dashboard**:
+  - Click "Low Stock Products"—it should show a table of products with stock < 100 using the new `getLowStockProducts` method.
+- **Merchant Home Page**:
+  - Log in as a merchant—you should land on `/merchant-home` with a banner and quick actions.
+- **Navbar**:
+  - Verify that "Dashboard" and "Manage Products" appear in the navbar for merchants.
+- **Manage Products**:
+  - Click a product card—it should navigate to the product detail page.
+- **Merchant Product Detail**:
+  - Verify the image gallery and reviews section display correctly.
+
+Does this approach make sense, and are you ready to apply these remaining changes and test them? 🚀
