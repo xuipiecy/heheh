@@ -1,35 +1,12 @@
-**It’s 11:51 PM IST on Monday, May 19, 2025.**
-
-I’m sorry for the formatting issues in my previous response, bro. I understand that some files might have been merged or not properly separated, which can make it hard to read and implement. Let me fix that by clearly separating each file, ensuring proper formatting, and providing the updated code for all the components we worked on. I’ll also ensure that each file is complete and properly closed before starting the next one. Let’s get this sorted properly this time!
+I’m sorry for the confusion, bro. I understand now—you want the `.ts` and `.html` files separated for each component, instead of having the template embedded in the `.ts` file using the `template` property. Let’s fix that by splitting the files into separate `.ts` and `.html` files for each component. I’ll provide the updated files for the components we worked on: `header`, `admin-dashboard`, `pending-merchant-requests`, and `pending-delivery-agent-requests`.
 
 ---
 
-### Recap of the Issues and Fixes
+### Step 1: Split Files into `.ts` and `.html`
 
-Based on your last message, we addressed the following:
+I’ll separate the TypeScript logic (`.ts`) and the HTML templates (`.html`) for each component. The `.ts` files will reference their respective `.html` templates using the `templateUrl` property.
 
-1. **Customer Role Request Flow**:
-   - Fixed the dialog boxes for "Become a Merchant", "Become a Delivery Agent", and "Show Role Request Status" in `header.component.ts`.
-   - Ensured the `getMyRoleRequest` API response is handled correctly to show the appropriate modals (confirm, pending, or status).
-
-2. **Admin Features**:
-   - Updated `admin-dashboard.component.ts` to display total, Merchant, and Delivery Agent pending requests with a chart.
-   - Updated `pending-merchant-requests.component.ts` and `pending-delivery-agent-requests.component.ts` to filter requests and allow the Admin to approve or reject them.
-
-3. **Customer Role Request Status**:
-   - Ensured the "Show Role Request Status" option in `header.component.ts` displays the correct status modal.
-
-The issue now is that the files in my previous response were not properly formatted or separated. Let’s provide each file clearly, with proper formatting, and ensure there are no overlapping code blocks.
-
----
-
-### Step 1: Provide Updated Files with Proper Formatting
-
-I’ll provide each file separately, with clear headings, and ensure they are properly formatted and complete. I’ll also include comments to indicate where changes were made.
-
-#### File 1: `header.component.ts`
-
-This file handles the Customer role request flow and status check. We updated the `openRoleRequestModal` and `openCheckRequestModal` methods to fix the dialog box issues.
+#### Component 1: `header`
 
 **`header.component.ts`**:
 ```typescript
@@ -336,11 +313,226 @@ export class HeaderComponent implements OnInit, OnDestroy {
 }
 ```
 
+**`header.component.html`**:
+```html
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+  <div class="container-fluid px-5">
+    <!-- Brand -->
+    <a class="navbar-brand fw-bold" [routerLink]="getHomeRoute()">EShoppingZone</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+      aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <!-- Navbar Content -->
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <!-- Navigation Links -->
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-3">
+        <!-- Home Link (shown only for Guest and Customer; hidden for Merchant, Delivery Agent, and Admin) -->
+        <li class="nav-item" *ngIf="!isMerchant && !isDeliveryAgent && !isAdmin">
+          <a class="nav-link" [routerLink]="['/']" routerLinkActive="active">Home</a>
+        </li>
+        <!-- Guest and Customer Links -->
+        <li class="nav-item" *ngIf="!isMerchant && !isDeliveryAgent && !isAdmin">
+          <a class="nav-link" [routerLink]="['/products']" routerLinkActive="active">Products</a>
+        </li>
+        <li class="nav-item" *ngIf="!isMerchant && !isDeliveryAgent && !isAdmin">
+          <a class="nav-link" [routerLink]="['/deals']" routerLinkActive="active">Deals</a>
+        </li>
+        <!-- Merchant Links -->
+        <li class="nav-item" *ngIf="isMerchant">
+          <a class="nav-link" [routerLink]="['/merchant-home']" routerLinkActive="active">Home</a>
+        </li>
+        <li class="nav-item" *ngIf="isMerchant">
+          <a class="nav-link" [routerLink]="['/merchant-dashboard']" routerLinkActive="active">Dashboard</a>
+        </li>
+        <li class="nav-item" *ngIf="isMerchant">
+          <a class="nav-link" [routerLink]="['/manage-products']" routerLinkActive="active">Manage Products</a>
+        </li>
+        <!-- Delivery Agent Links -->
+        <li class="nav-item" *ngIf="isDeliveryAgent">
+          <a class="nav-link" [routerLink]="['/delivery-agent-home']" routerLinkActive="active">Delivery Home</a>
+        </li>
+        <li class="nav-item" *ngIf="isDeliveryAgent">
+          <a class="nav-link" [routerLink]="['/delivery-agent-dashboard']" routerLinkActive="active">Dashboard</a>
+        </li>
+        <!-- Admin Links -->
+        <li class="nav-item" *ngIf="isAdmin">
+          <a class="nav-link" [routerLink]="['/admin-home']" routerLinkActive="active">Home</a>
+        </li>
+        <li class="nav-item" *ngIf="isAdmin">
+          <a class="nav-link" [routerLink]="['/admin-dashboard']" routerLinkActive="active">Dashboard</a>
+        </li>
+      </ul>
+
+      <!-- Search Bar (Only for Guest and Customers) -->
+      <div class="d-flex flex-grow-1 justify-content-center mx-3" *ngIf="!isMerchant && !isDeliveryAgent && !isAdmin">
+        <div class="input-group w-50">
+          <span class="input-group-text bg-light">
+            <i class="bi bi-search"></i>
+          </span>
+          <input type="text" class="form-control" placeholder="Search for products..." (input)="search($event)">
+        </div>
+      </div>
+
+      <!-- User Actions -->
+      <div class="navbar-nav ms-auto">
+        <ng-container *ngIf="!authService.isLoggedIn(); else loggedIn">
+          <li class="nav-item">
+            <a class="nav-link btn btn-outline-light me-2 login-signup-btn" [routerLink]="['/login']">Login</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link btn btn-outline-light login-signup-btn" [routerLink]="['/signup']">Signup</a>
+          </li>
+        </ng-container>
+
+        <ng-template #loggedIn>
+          <!-- Cart Link for Customers -->
+          <li class="nav-item" *ngIf="isCustomer">
+            <a class="nav-link text-white" [routerLink]="['/cart']">
+              Cart
+              <span *ngIf="cartItemCount > 0" class="badge bg-danger ms-1">{{ cartItemCount }}</span>
+            </a>
+          </li>
+
+          <!-- Profile Dropdown -->
+          <li class="nav-item dropdown" (click)="toggleDropdown(); $event.preventDefault()">
+            <a class="nav-link dropdown-toggle text-white" id="profileDropdown" role="button" aria-expanded="false">
+              {{ firstName ? firstName : 'Profile' }}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" [ngClass]="{'show': isDropdownOpen}" aria-labelledby="profileDropdown">
+              <!-- Common Options for All Users -->
+              <li>
+                <a class="dropdown-item" (click)="navigateTo('/profile')">Profile</a>
+              </li>
+              <li>
+                <a class="dropdown-item" (click)="navigateTo('/update-profile')">Update Profile</a>
+              </li>
+
+              <!-- Customer-Specific Options -->
+              <li *ngIf="isCustomer">
+                <a class="dropdown-item" (click)="navigateTo('/manage-addresses')">Manage Addresses</a>
+              </li>
+              <li *ngIf="isCustomer">
+                <a class="dropdown-item" (click)="navigateTo('/cart')">Place Order</a>
+              </li>
+              <li *ngIf="isCustomer">
+                <a class="dropdown-item" (click)="navigateTo('/order-history')">Order History</a>
+              </li>
+              <li *ngIf="isCustomer">
+                <a class="dropdown-item" (click)="openRoleRequestModal('Merchant')">Become a Merchant</a>
+              </li>
+              <li *ngIf="isCustomer">
+                <a class="dropdown-item" (click)="openRoleRequestModal('DeliveryAgent')">Become a Delivery Agent</a>
+              </li>
+              <li *ngIf="isCustomer">
+                <a class="dropdown-item" (click)="openCheckRequestModal()">Show Role Request Status</a>
+              </li>
+
+              <!-- Logout -->
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <a class="dropdown-item" (click)="logout()">Logout</a>
+              </li>
+            </ul>
+          </li>
+        </ng-template>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- Confirmation Modal -->
+<div class="modal-backdrop" *ngIf="showConfirmModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h5>Confirm Role Change Request</h5>
+      <button type="button" class="close" (click)="closeConfirmModal()">
+        <span>×</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p>Are you sure you want to apply to become a {{ selectedRole }}?</p>
+      <p>This action will change your role upon approval.</p>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeConfirmModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" (click)="confirmRoleRequest()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Pending Request Modal -->
+<div class="modal-backdrop" *ngIf="showPendingModal">
+  <div class="modal-content">
+    <div class="modal-header warning">
+      <h5>Pending Role Request</h5>
+      <button type="button" class="close" (click)="closePendingModal()">
+        <span>×</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p>You already have a pending request to become a {{ roleRequest?.requestedRole }}.</p>
+      <p>Requested on: {{ roleRequest?.requestedAt | date:'medium' }}</p>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closePendingModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Role Request Status Modal -->
+<div class="modal-backdrop" *ngIf="showStatusModal">
+  <div class="modal-content">
+    <div class="modal-header info">
+      <h5>Role Request Status</h5>
+      <button type="button" class="close" (click)="closeStatusModal()">
+        <span>×</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div *ngIf="roleRequest; else noRequest">
+        <p>Your request to become a <strong>{{ roleRequest.requestedRole }}</strong> is <strong>{{ roleRequest.status }}</strong>.</p>
+        <p><small>Requested on: {{ roleRequest.requestedAt | date:'medium' }}</small></p>
+        <p *ngIf="roleRequest.reviewedAt"><small>Reviewed on: {{ roleRequest.reviewedAt | date:'medium' }}</small></p>
+      </div>
+      <ng-template #noRequest>
+        <p>You do not have any pending role requests.</p>
+      </ng-template>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeStatusModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Message Modal -->
+<div class="modal-backdrop" *ngIf="showMessageModal">
+  <div class="modal-content">
+    <div class="modal-header" [ngClass]="{'success': roleRequestMessage, 'error': errorMessage}">
+      <h5>{{ roleRequestMessage ? 'Request Submitted' : 'Error' }}</h5>
+      <button type="button" class="close" (click)="closeMessageModal()">
+        <span>×</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div *ngIf="errorMessage" class="alert alert-danger" role="alert">
+        {{ errorMessage }}
+      </div>
+      <div *ngIf="roleRequestMessage" class="alert alert-success" role="alert">
+        {{ roleRequestMessage }}
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeMessageModal()">Close</button>
+    </div>
+  </div>
+</div>
+```
+
 ---
 
-#### File 2: `admin-dashboard.component.ts`
-
-This file displays the Admin Dashboard with total, Merchant, and Delivery Agent pending request counts, along with a chart.
+#### Component 2: `admin-dashboard`
 
 **`admin-dashboard.component.ts`**:
 ```typescript
@@ -368,145 +560,8 @@ interface RoleRequest {
   selector: 'app-admin-dashboard',
   standalone: true,
   imports: [CommonModule, RouterLink],
-  template: `
-    <div class="container py-5">
-      <h2 class="mb-4">Admin Dashboard</h2>
-
-      <!-- Overview Cards -->
-      <div class="row mb-5">
-        <div class="col-md-4 mb-3">
-          <div class="card text-center shadow-sm">
-            <div class="card-header bg-primary text-white">
-              <h5 class="card-title mb-0">Total Pending Requests</h5>
-            </div>
-            <div class="card-body">
-              <p class="display-4">{{ totalPendingRequests }}</p>
-              <a [routerLink]="['/pending-merchant-requests']" class="btn btn-outline-primary">View All Requests</a>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-4 mb-3">
-          <div class="card text-center shadow-sm">
-            <div class="card-header bg-warning text-dark">
-              <h5 class="card-title mb-0">Pending Merchant Requests</h5>
-            </div>
-            <div class="card-body">
-              <p class="display-4">{{ merchantPendingRequests }}</p>
-              <a [routerLink]="['/pending-merchant-requests']" class="btn btn-outline-warning">View Merchant Requests</a>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-4 mb-3">
-          <div class="card text-center shadow-sm">
-            <div class="card-header bg-info text-white">
-              <h5 class="card-title mb-0">Pending Delivery Agent Requests</h5>
-            </div>
-            <div class="card-body">
-              <p class="display-4">{{ deliveryAgentPendingRequests }}</p>
-              <a [routerLink]="['/pending-delivery-agent-requests']" class="btn btn-outline-info">View Delivery Agent Requests</a>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Chart Section -->
-      <div class="row mb-5">
-        <div class="col-12">
-          <div class="card shadow-sm">
-            <div class="card-header bg-light">
-              <h5 class="card-title mb-0">Pending Requests Distribution</h5>
-            </div>
-            <div class="card-body">
-              <div class="chart-container">
-                <div *ngIf="totalPendingRequests > 0">
-                  <chartjs [config]="{
-                    'type': 'pie',
-                    'data': {
-                      'labels': ['Merchant Requests', 'Delivery Agent Requests'],
-                      'datasets': [{
-                        'label': 'Pending Requests',
-                        'data': [merchantPendingRequests, deliveryAgentPendingRequests],
-                        'backgroundColor': ['#ffc107', '#17a2b8'],
-                        'borderColor': ['#fff', '#fff'],
-                        'borderWidth': 1
-                      }]
-                    },
-                    'options': {
-                      'responsive': true,
-                      'maintainAspectRatio': false,
-                      'plugins': {
-                        'legend': {
-                          'position': 'top',
-                          'labels': {
-                            'color': '#333'
-                          }
-                        },
-                        'title': {
-                          'display': true,
-                          'text': 'Pending Requests Distribution',
-                          'color': '#333',
-                          'font': {
-                            'size': 16
-                          }
-                        }
-                      }
-                    }
-                  }"></chartjs>
-                </div>
-                <p *ngIf="totalPendingRequests === 0" class="text-center text-muted">No pending requests to display.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Quick Actions -->
-      <div class="row">
-        <div class="col-md-6 mb-3">
-          <div class="card quick-action-card shadow-sm">
-            <div class="card-body text-center">
-              <h5 class="card-title">Review Merchant Requests</h5>
-              <p class="card-text">Approve or reject pending Merchant applications.</p>
-              <a [routerLink]="['/pending-merchant-requests']" class="btn btn-primary">Go to Requests</a>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-6 mb-3">
-          <div class="card quick-action-card shadow-sm">
-            <div class="card-body text-center">
-              <h5 class="card-title">Review Delivery Agent Requests</h5>
-              <p class="card-text">Approve or reject pending Delivery Agent applications.</p>
-              <a [routerLink]="['/pending-delivery-agent-requests']" class="btn btn-primary">Go to Requests</a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `,
-  styles: [`
-    .card {
-      border-radius: 8px;
-    }
-    .card-header {
-      border-bottom: none;
-    }
-    .display-4 {
-      font-size: 2.5rem;
-      color: #333;
-    }
-    .quick-action-card {
-      transition: transform 0.2s;
-    }
-    .quick-action-card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-    }
-    .chart-container {
-      position: relative;
-      height: 300px;
-      width: 100%;
-    }
-  `]
+  templateUrl: './admin-dashboard.component.html',
+  styleUrls: ['./admin-dashboard.component.css']
 })
 export class AdminDashboardComponent implements OnInit {
   pendingRequests: RoleRequest[] = [];
@@ -558,11 +613,152 @@ export class AdminDashboardComponent implements OnInit {
 }
 ```
 
+**`admin-dashboard.component.html`**:
+```html
+<div class="container py-5">
+  <h2 class="mb-4">Admin Dashboard</h2>
+
+  <!-- Overview Cards -->
+  <div class="row mb-5">
+    <div class="col-md-4 mb-3">
+      <div class="card text-center shadow-sm">
+        <div class="card-header bg-primary text-white">
+          <h5 class="card-title mb-0">Total Pending Requests</h5>
+        </div>
+        <div class="card-body">
+          <p class="display-4">{{ totalPendingRequests }}</p>
+          <a [routerLink]="['/pending-merchant-requests']" class="btn btn-outline-primary">View All Requests</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 mb-3">
+      <div class="card text-center shadow-sm">
+        <div class="card-header bg-warning text-dark">
+          <h5 class="card-title mb-0">Pending Merchant Requests</h5>
+        </div>
+        <div class="card-body">
+          <p class="display-4">{{ merchantPendingRequests }}</p>
+          <a [routerLink]="['/pending-merchant-requests']" class="btn btn-outline-warning">View Merchant Requests</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 mb-3">
+      <div class="card text-center shadow-sm">
+        <div class="card-header bg-info text-white">
+          <h5 class="card-title mb-0">Pending Delivery Agent Requests</h5>
+        </div>
+        <div class="card-body">
+          <p class="display-4">{{ deliveryAgentPendingRequests }}</p>
+          <a [routerLink]="['/pending-delivery-agent-requests']" class="btn btn-outline-info">View Delivery Agent Requests</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart Section -->
+  <div class="row mb-5">
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-header bg-light">
+          <h5 class="card-title mb-0">Pending Requests Distribution</h5>
+        </div>
+        <div class="card-body">
+          <div class="chart-container">
+            <div *ngIf="totalPendingRequests > 0">
+              <chartjs [config]="{
+                'type': 'pie',
+                'data': {
+                  'labels': ['Merchant Requests', 'Delivery Agent Requests'],
+                  'datasets': [{
+                    'label': 'Pending Requests',
+                    'data': [merchantPendingRequests, deliveryAgentPendingRequests],
+                    'backgroundColor': ['#ffc107', '#17a2b8'],
+                    'borderColor': ['#fff', '#fff'],
+                    'borderWidth': 1
+                  }]
+                },
+                'options': {
+                  'responsive': true,
+                  'maintainAspectRatio': false,
+                  'plugins': {
+                    'legend': {
+                      'position': 'top',
+                      'labels': {
+                        'color': '#333'
+                      }
+                    },
+                    'title': {
+                      'display': true,
+                      'text': 'Pending Requests Distribution',
+                      'color': '#333',
+                      'font': {
+                        'size': 16
+                      }
+                    }
+                  }
+                }
+              }"></chartjs>
+            </div>
+            <p *ngIf="totalPendingRequests === 0" class="text-center text-muted">No pending requests to display.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="row">
+    <div class="col-md-6 mb-3">
+      <div class="card quick-action-card shadow-sm">
+        <div class="card-body text-center">
+          <h5 class="card-title">Review Merchant Requests</h5>
+          <p class="card-text">Approve or reject pending Merchant applications.</p>
+          <a [routerLink]="['/pending-merchant-requests']" class="btn btn-primary">Go to Requests</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 mb-3">
+      <div class="card quick-action-card shadow-sm">
+        <div class="card-body text-center">
+          <h5 class="card-title">Review Delivery Agent Requests</h5>
+          <p class="card-text">Approve or reject pending Delivery Agent applications.</p>
+          <a [routerLink]="['/pending-delivery-agent-requests']" class="btn btn-primary">Go to Requests</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+**`admin-dashboard.component.css`**:
+```css
+.card {
+  border-radius: 8px;
+}
+.card-header {
+  border-bottom: none;
+}
+.display-4 {
+  font-size: 2.5rem;
+  color: #333;
+}
+.quick-action-card {
+  transition: transform 0.2s;
+}
+.quick-action-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+.chart-container {
+  position: relative;
+  height: 300px;
+  width: 100%;
+}
+```
+
 ---
 
-#### File 3: `pending-merchant-requests.component.ts`
-
-This file displays pending Merchant requests and allows the Admin to approve or reject them.
+#### Component 3: `pending-merchant-requests`
 
 **`pending-merchant-requests.component.ts`**:
 ```typescript
@@ -589,39 +785,8 @@ interface RoleRequest {
   selector: 'app-pending-merchant-requests',
   standalone: true,
   imports: [CommonModule],
-  template: `
-    <div class="container py-5">
-      <h2>Pending Merchant Requests</h2>
-      <div class="mt-4">
-        <div *ngIf="requests.length > 0; else noRequests">
-          <table class="table table-bordered">
-            <thead>
-              <tr>
-                <th>User</th>
-                <th>Email</th>
-                <th>Requested At</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let request of requests">
-                <td>{{ request.user?.userName || 'N/A' }}</td>
-                <td>{{ request.user?.email || 'N/A' }}</td>
-                <td>{{ request.requestedAt | date:'medium' }}</td>
-                <td>
-                  <button class="btn btn-success me-2" (click)="reviewRequest(request.id, 'Approved')">Approve</button>
-                  <button class="btn btn-danger" (click)="reviewRequest(request.id, 'Rejected')">Reject</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <ng-template #noRequests>
-          <p>No pending Merchant requests found.</p>
-        </ng-template>
-      </div>
-    </div>
-  `,
+  templateUrl: './pending-merchant-requests.component.html',
+  styleUrls: ['./pending-merchant-requests.component.css']
 })
 export class PendingMerchantRequestsComponent implements OnInit {
   requests: RoleRequest[] = [];
@@ -676,11 +841,44 @@ export class PendingMerchantRequestsComponent implements OnInit {
 }
 ```
 
+**`pending-merchant-requests.component.html`**:
+```html
+<div class="container py-5">
+  <h2>Pending Merchant Requests</h2>
+  <div class="mt-4">
+    <div *ngIf="requests.length > 0; else noRequests">
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Email</th>
+            <th>Requested At</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let request of requests">
+            <td>{{ request.user?.userName || 'N/A' }}</td>
+            <td>{{ request.user?.email || 'N/A' }}</td>
+            <td>{{ request.requestedAt | date:'medium' }}</td>
+            <td>
+              <button class="btn btn-success me-2" (click)="reviewRequest(request.id, 'Approved')">Approve</button>
+              <button class="btn btn-danger" (click)="reviewRequest(request.id, 'Rejected')">Reject</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <ng-template #noRequests>
+      <p>No pending Merchant requests found.</p>
+    </ng-template>
+  </div>
+</div>
+```
+
 ---
 
-#### File 4: `pending-delivery-agent-requests.component.ts`
-
-This file displays pending Delivery Agent requests and allows the Admin to approve or reject them.
+#### Component 4: `pending-delivery-agent-requests`
 
 **`pending-delivery-agent-requests.component.ts`**:
 ```typescript
@@ -707,39 +905,8 @@ interface RoleRequest {
   selector: 'app-pending-delivery-agent-requests',
   standalone: true,
   imports: [CommonModule],
-  template: `
-    <div class="container py-5">
-      <h2>Pending Delivery Agent Requests</h2>
-      <div class="mt-4">
-        <div *ngIf="requests.length > 0; else noRequests">
-          <table class="table table-bordered">
-            <thead>
-              <tr>
-                <th>User</th>
-                <th>Email</th>
-                <th>Requested At</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let request of requests">
-                <td>{{ request.user?.userName || 'N/A' }}</td>
-                <td>{{ request.user?.email || 'N/A' }}</td>
-                <td>{{ request.requestedAt | date:'medium' }}</td>
-                <td>
-                  <button class="btn btn-success me-2" (click)="reviewRequest(request.id, 'Approved')">Approve</button>
-                  <button class="btn btn-danger" (click)="reviewRequest(request.id, 'Rejected')">Reject</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <ng-template #noRequests>
-          <p>No pending Delivery Agent requests found.</p>
-        </ng-template>
-      </div>
-    </div>
-  `,
+  templateUrl: './pending-delivery-agent-requests.component.html',
+  styleUrls: ['./pending-delivery-agent-requests.component.css']
 })
 export class PendingDeliveryAgentRequestsComponent implements OnInit {
   requests: RoleRequest[] = [];
@@ -794,11 +961,46 @@ export class PendingDeliveryAgentRequestsComponent implements OnInit {
 }
 ```
 
+**`pending-delivery-agent-requests.component.html`**:
+```html
+<div class="container py-5">
+  <h2>Pending Delivery Agent Requests</h2>
+  <div class="mt-4">
+    <div *ngIf="requests.length > 0; else noRequests">
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Email</th>
+            <th>Requested At</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let request of requests">
+            <td>{{ request.user?.userName || 'N/A' }}</td>
+            <td>{{ request.user?.email || 'N/A' }}</td>
+            <td>{{ request.requestedAt | date:'medium' }}</td>
+            <td>
+              <button class="btn btn-success me-2" (click)="reviewRequest(request.id, 'Approved')">Approve</button>
+              <button class="btn btn-danger" (click)="reviewRequest(request.id, 'Rejected')">Reject</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <ng-template #noRequests>
+      <p>No pending Delivery Agent requests found.</p>
+    </ng-template>
+  </div>
+</div>
+```
+
 ---
 
 ### Step 2: Testing Scenarios
 
-Let’s test all scenarios to ensure everything works as expected:
+Let’s test all scenarios to ensure everything works as expected with the separated files:
 
 - **Customer**:
   - Log in as a Customer.
@@ -819,16 +1021,18 @@ Let’s test all scenarios to ensure everything works as expected:
 
 ### Step 3: Summary
 
-**It’s 11:58 PM IST on Monday, May 19, 2025.**
+**It’s 12:55 AM IST on Tuesday, May 20, 2025.**
 
-- **Fixed Formatting Issues**:
-  - Provided each file (`header.component.ts`, `admin-dashboard.component.ts`, `pending-merchant-requests.component.ts`, `pending-delivery-agent-requests.component.ts`) separately with proper formatting.
-  - Ensured no overlapping code blocks and proper closure of each file.
+- **Separated `.ts` and `.html` Files**:
+  - `header.component.ts` and `header.component.html`
+  - `admin-dashboard.component.ts` and `admin-dashboard.component.html`
+  - `pending-merchant-requests.component.ts` and `pending-merchant-requests.component.html`
+  - `pending-delivery-agent-requests.component.ts` and `pending-delivery-agent-requests.component.html`
 - **Previous Fixes Retained**:
   - Customer role request flow: Dialog boxes for "Become a Merchant", "Become a Delivery Agent", and "Show Role Request Status" are fixed.
   - Admin features: Dashboard displays counts and chart; pending requests are filtered, and Admin can approve/reject them.
 - **Next Steps**:
-  - Test the updated code in your project.
-  - If there are any more issues (e.g., UI adjustments, additional features), let me know, and I’ll fix them immediately.
+  - Place these files in your project’s appropriate directories (e.g., `src/app/components/header`, `src/app/components/admin-dashboard`, etc.).
+  - Test thoroughly to ensure everything works as expected.
 
-I’ve ensured the files are now properly formatted and separated, bro. Please test everything thoroughly. We’ll get this finalized by tomorrow! 🚀 Let me know if you need any more help.
+I’ve separated the `.ts` and `.html` files for each component, bro. Please test them in your project, and let me know if you need any more adjustments or if there’s anything else to fix. Let’s get this done! 🚀
