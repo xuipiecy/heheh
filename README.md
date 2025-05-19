@@ -1,540 +1,15 @@
-I’m sorry for the confusion, bro. I understand now—you want the `.ts` and `.html` files separated for each component, instead of having the template embedded in the `.ts` file using the `template` property. Let’s fix that by splitting the files into separate `.ts` and `.html` files for each component. I’ll provide the updated files for the components we worked on: `header`, `admin-dashboard`, `pending-merchant-requests`, and `pending-delivery-agent-requests`.
+Let’s dive into the issue with the chart in the `admin-dashboard.component.html` file. Since you’ve already mentioned that you’ve imported everything in the `.ts` file and run `npm install`, we’ll focus on why the chart might not be rendering properly. I’ll guide you through a series of questions to help us identify the root cause and fix it step by step.
 
 ---
 
-### Step 1: Split Files into `.ts` and `.html`
+### Step 1: Understand the Current Setup
+You’ve updated the `admin-dashboard.component.ts` to include the necessary imports, and you’ve run `npm install` to ensure all dependencies are installed. The chart is supposed to display a pie chart showing the distribution of pending Merchant and Delivery Agent requests. However, it’s not rendering as expected.
 
-I’ll separate the TypeScript logic (`.ts`) and the HTML templates (`.html`) for each component. The `.ts` files will reference their respective `.html` templates using the `templateUrl` property.
+Let’s break this down systematically. First, let’s look at the relevant parts of the files involved.
 
-#### Component 1: `header`
+#### Current `admin-dashboard.component.ts`
+Here’s the current TypeScript file for the Admin Dashboard component, which fetches the data for the chart:
 
-**`header.component.ts`**:
-```typescript
-import { Component, OnInit, OnDestroy } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
-import { AuthService } from '../../services/auth.service';
-import { CartService } from '../../services/cart.service';
-import { RoleService } from '../../services/role.service';
-import { Subscription } from 'rxjs';
-
-interface RoleRequest {
-  id: number;
-  userId: number;
-  requestedRole: string;
-  status: string;
-  requestedAt: string;
-  reviewedAt: string | null;
-}
-
-@Component({
-  selector: 'app-header',
-  standalone: true,
-  imports: [CommonModule, RouterLink, RouterLinkActive],
-  templateUrl: './header.component.html',
-  styleUrls: ['./header.component.css']
-})
-export class HeaderComponent implements OnInit, OnDestroy {
-  searchQuery: string = '';
-  isDropdownOpen: boolean = false;
-  cartItemCount: number = 0;
-  firstName: string | null = null;
-  isMerchant: boolean = false;
-  isCustomer: boolean = false;
-  isDeliveryAgent: boolean = false;
-  isAdmin: boolean = false;
-  selectedRole: string | null = null;
-  roleRequest: RoleRequest | null = null;
-  roleRequestMessage: string | null = null;
-  errorMessage: string | null = null;
-  showConfirmModal: boolean = false;
-  showPendingModal: boolean = false;
-  showStatusModal: boolean = false;
-  showMessageModal: boolean = false;
-  private authSubscription!: Subscription;
-
-  constructor(
-    public authService: AuthService,
-    private router: Router,
-    private cartService: CartService,
-    private roleService: RoleService
-  ) {
-    this.updateCartCount();
-  }
-
-  ngOnInit() {
-    this.authSubscription = this.authService.authState$.subscribe(isLoggedIn => {
-      this.updateHeaderState(isLoggedIn);
-    });
-
-    this.router.events.subscribe(event => {
-      if (event instanceof NavigationEnd) {
-        this.closeDropdown();
-      }
-    });
-  }
-
-  ngOnDestroy() {
-    if (this.authSubscription) {
-      this.authSubscription.unsubscribe();
-    }
-  }
-
-  getHomeRoute(): string {
-    if (this.isMerchant) {
-      return '/merchant-home';
-    } else if (this.isDeliveryAgent) {
-      return '/delivery-agent-home';
-    } else if (this.isAdmin) {
-      return '/admin-home';
-    } else {
-      return '/';
-    }
-  }
-
-  updateHeaderState(isLoggedIn: boolean) {
-    if (isLoggedIn) {
-      this.authService.viewProfile().subscribe({
-        next: (response) => {
-          if (response.success && response.data) {
-            this.firstName = response.data.fullName.split(' ')[0];
-          }
-        },
-        error: (err) => {
-          console.error('Error fetching profile:', err);
-          this.firstName = null;
-        }
-      });
-
-      const userRole = this.authService.getUserRole();
-      this.isMerchant = userRole === 'Merchant';
-      this.isCustomer = userRole === 'Customer';
-      this.isDeliveryAgent = userRole === 'Delivery Agent';
-      this.isAdmin = userRole === 'Admin';
-
-      if (this.isCustomer) {
-        this.cartService.cartUpdate$.subscribe(count => {
-          this.cartItemCount = count;
-        });
-        this.updateCartCount();
-      } else {
-        this.cartItemCount = 0;
-      }
-    } else {
-      this.firstName = null;
-      this.isMerchant = false;
-      this.isCustomer = false;
-      this.isDeliveryAgent = false;
-      this.isAdmin = false;
-      this.cartItemCount = 0;
-    }
-  }
-
-  search(event: Event) {
-    const query = (event.target as HTMLInputElement).value;
-    this.router.navigate(['/products'], { queryParams: { search: query } });
-  }
-
-  toggleDropdown(event?: Event) {
-    if (event) {
-      event.preventDefault();
-    }
-    this.isDropdownOpen = !this.isDropdownOpen;
-  }
-
-  closeDropdown() {
-    this.isDropdownOpen = false;
-  }
-
-  logout() {
-    this.authService.logout();
-    this.isDropdownOpen = false;
-  }
-
-  updateCartCount() {
-    if (this.authService.isLoggedIn() && this.authService.getUserRole() === 'Customer') {
-      this.cartService.getCart().subscribe({
-        next: (response) => {
-          if (response.success && response.data) {
-            this.cartItemCount = response.data.items.reduce((sum, item) => sum + item.quantity, 0);
-          }
-        },
-        error: (err) => {
-          console.error('Error fetching cart count:', err);
-        }
-      });
-    }
-  }
-
-  navigateTo(route: string) {
-    this.router.navigate([route]);
-    this.closeDropdown();
-  }
-
-  openRoleRequestModal(role: string) {
-    if (!this.authService.isLoggedIn()) {
-      this.errorMessage = 'Please log in to submit a role request.';
-      this.showMessageModal = true;
-      console.log('Not logged in, showing message modal');
-      return;
-    }
-
-    this.selectedRole = role;
-    console.log(`Attempting to open role request modal for role: ${role}`);
-
-    this.roleService.getMyRoleRequest().subscribe({
-      next: (response) => {
-        console.log('getMyRoleRequest response:', response);
-        if (response && typeof response.success === 'boolean') {
-          if (response.success && response.data) {
-            // Existing request found
-            this.roleRequest = response.data;
-            console.log('Existing request found:', this.roleRequest);
-            this.showPendingModal = true;
-            console.log('showPendingModal set to true');
-          } else {
-            // No existing request, show confirm modal
-            console.log('No existing request, showing confirm modal');
-            this.roleRequest = null;
-            this.showConfirmModal = true;
-            console.log('showConfirmModal set to true');
-          }
-        } else {
-          console.error('Unexpected response format:', response);
-          this.errorMessage = 'Unexpected response from server. Please try again later.';
-          this.showMessageModal = true;
-          console.log('Showing error message modal due to unexpected response');
-        }
-      },
-      error: (err) => {
-        console.error('Error checking role requests:', err);
-        this.errorMessage = err.message || 'Unable to check existing role requests. Please try again later.';
-        this.showMessageModal = true;
-        console.log('Error occurred, showing message modal');
-      }
-    });
-  }
-
-  confirmRoleRequest() {
-    if (!this.selectedRole) {
-      console.log('No selected role to confirm');
-      return;
-    }
-
-    console.log(`Submitting role request for: ${this.selectedRole}`);
-    this.roleService.submitRoleRequest({ requestedRole: this.selectedRole }).subscribe({
-      next: (response) => {
-        console.log('submitRoleRequest response:', response);
-        this.showConfirmModal = false;
-        console.log('Closed confirm modal after submission');
-        if (response && typeof response.success === 'boolean') {
-          if (response.success) {
-            this.roleRequestMessage = `Your request to become a ${this.selectedRole} has been submitted successfully! Stay tuned for updates—we’ll notify you once your application is reviewed. 🚀`;
-            this.errorMessage = null;
-          } else {
-            this.errorMessage = response.message || 'Failed to submit role request.';
-            this.roleRequestMessage = null;
-          }
-          this.showMessageModal = true;
-          console.log('Showing message modal after submission');
-        } else {
-          console.error('Unexpected response format:', response);
-          this.errorMessage = 'Unexpected response from server. Please try again later.';
-          this.roleRequestMessage = null;
-          this.showMessageModal = true;
-          console.log('Showing error message modal due to unexpected response');
-        }
-      },
-      error: (err) => {
-        console.error('Error submitting role request:', err);
-        this.showConfirmModal = false;
-        this.errorMessage = err.message || 'Failed to submit role request. Please try again later.';
-        this.roleRequestMessage = null;
-        this.showMessageModal = true;
-        console.log('Error occurred, showing message modal');
-      }
-    });
-  }
-
-  openCheckRequestModal() {
-    if (!this.authService.isLoggedIn()) {
-      this.errorMessage = 'Please log in to check your role request status.';
-      this.showMessageModal = true;
-      console.log('Not logged in, showing message modal');
-      return;
-    }
-
-    console.log('Attempting to open check request modal');
-    this.roleService.getMyRoleRequest().subscribe({
-      next: (response) => {
-        console.log('getMyRoleRequest response for status check:', response);
-        if (response && typeof response.success === 'boolean') {
-          this.roleRequest = response.success ? response.data : null;
-          this.roleRequestMessage = response.message || 'No message provided';
-          this.showStatusModal = true;
-          console.log('showStatusModal set to true');
-        } else {
-          console.error('Unexpected response format:', response);
-          this.errorMessage = 'Unexpected response from server. Please try again later.';
-          this.showMessageModal = true;
-          console.log('Showing error message modal due to unexpected response');
-        }
-      },
-      error: (err) => {
-        console.error('Error checking role requests:', err);
-        this.errorMessage = err.message || 'Failed to check role request status. Please try again later.';
-        this.showMessageModal = true;
-        console.log('Error occurred, showing message modal');
-      }
-    });
-  }
-
-  closeConfirmModal() {
-    this.showConfirmModal = false;
-    console.log('Closed confirm modal');
-  }
-
-  closePendingModal() {
-    this.showPendingModal = false;
-    console.log('Closed pending modal');
-  }
-
-  closeStatusModal() {
-    this.showStatusModal = false;
-    console.log('Closed status modal');
-  }
-
-  closeMessageModal() {
-    this.showMessageModal = false;
-    this.errorMessage = null;
-    this.roleRequestMessage = null;
-    console.log('Closed message modal');
-  }
-}
-```
-
-**`header.component.html`**:
-```html
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-  <div class="container-fluid px-5">
-    <!-- Brand -->
-    <a class="navbar-brand fw-bold" [routerLink]="getHomeRoute()">EShoppingZone</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-      aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-
-    <!-- Navbar Content -->
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <!-- Navigation Links -->
-      <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-3">
-        <!-- Home Link (shown only for Guest and Customer; hidden for Merchant, Delivery Agent, and Admin) -->
-        <li class="nav-item" *ngIf="!isMerchant && !isDeliveryAgent && !isAdmin">
-          <a class="nav-link" [routerLink]="['/']" routerLinkActive="active">Home</a>
-        </li>
-        <!-- Guest and Customer Links -->
-        <li class="nav-item" *ngIf="!isMerchant && !isDeliveryAgent && !isAdmin">
-          <a class="nav-link" [routerLink]="['/products']" routerLinkActive="active">Products</a>
-        </li>
-        <li class="nav-item" *ngIf="!isMerchant && !isDeliveryAgent && !isAdmin">
-          <a class="nav-link" [routerLink]="['/deals']" routerLinkActive="active">Deals</a>
-        </li>
-        <!-- Merchant Links -->
-        <li class="nav-item" *ngIf="isMerchant">
-          <a class="nav-link" [routerLink]="['/merchant-home']" routerLinkActive="active">Home</a>
-        </li>
-        <li class="nav-item" *ngIf="isMerchant">
-          <a class="nav-link" [routerLink]="['/merchant-dashboard']" routerLinkActive="active">Dashboard</a>
-        </li>
-        <li class="nav-item" *ngIf="isMerchant">
-          <a class="nav-link" [routerLink]="['/manage-products']" routerLinkActive="active">Manage Products</a>
-        </li>
-        <!-- Delivery Agent Links -->
-        <li class="nav-item" *ngIf="isDeliveryAgent">
-          <a class="nav-link" [routerLink]="['/delivery-agent-home']" routerLinkActive="active">Delivery Home</a>
-        </li>
-        <li class="nav-item" *ngIf="isDeliveryAgent">
-          <a class="nav-link" [routerLink]="['/delivery-agent-dashboard']" routerLinkActive="active">Dashboard</a>
-        </li>
-        <!-- Admin Links -->
-        <li class="nav-item" *ngIf="isAdmin">
-          <a class="nav-link" [routerLink]="['/admin-home']" routerLinkActive="active">Home</a>
-        </li>
-        <li class="nav-item" *ngIf="isAdmin">
-          <a class="nav-link" [routerLink]="['/admin-dashboard']" routerLinkActive="active">Dashboard</a>
-        </li>
-      </ul>
-
-      <!-- Search Bar (Only for Guest and Customers) -->
-      <div class="d-flex flex-grow-1 justify-content-center mx-3" *ngIf="!isMerchant && !isDeliveryAgent && !isAdmin">
-        <div class="input-group w-50">
-          <span class="input-group-text bg-light">
-            <i class="bi bi-search"></i>
-          </span>
-          <input type="text" class="form-control" placeholder="Search for products..." (input)="search($event)">
-        </div>
-      </div>
-
-      <!-- User Actions -->
-      <div class="navbar-nav ms-auto">
-        <ng-container *ngIf="!authService.isLoggedIn(); else loggedIn">
-          <li class="nav-item">
-            <a class="nav-link btn btn-outline-light me-2 login-signup-btn" [routerLink]="['/login']">Login</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link btn btn-outline-light login-signup-btn" [routerLink]="['/signup']">Signup</a>
-          </li>
-        </ng-container>
-
-        <ng-template #loggedIn>
-          <!-- Cart Link for Customers -->
-          <li class="nav-item" *ngIf="isCustomer">
-            <a class="nav-link text-white" [routerLink]="['/cart']">
-              Cart
-              <span *ngIf="cartItemCount > 0" class="badge bg-danger ms-1">{{ cartItemCount }}</span>
-            </a>
-          </li>
-
-          <!-- Profile Dropdown -->
-          <li class="nav-item dropdown" (click)="toggleDropdown(); $event.preventDefault()">
-            <a class="nav-link dropdown-toggle text-white" id="profileDropdown" role="button" aria-expanded="false">
-              {{ firstName ? firstName : 'Profile' }}
-            </a>
-            <ul class="dropdown-menu dropdown-menu-end" [ngClass]="{'show': isDropdownOpen}" aria-labelledby="profileDropdown">
-              <!-- Common Options for All Users -->
-              <li>
-                <a class="dropdown-item" (click)="navigateTo('/profile')">Profile</a>
-              </li>
-              <li>
-                <a class="dropdown-item" (click)="navigateTo('/update-profile')">Update Profile</a>
-              </li>
-
-              <!-- Customer-Specific Options -->
-              <li *ngIf="isCustomer">
-                <a class="dropdown-item" (click)="navigateTo('/manage-addresses')">Manage Addresses</a>
-              </li>
-              <li *ngIf="isCustomer">
-                <a class="dropdown-item" (click)="navigateTo('/cart')">Place Order</a>
-              </li>
-              <li *ngIf="isCustomer">
-                <a class="dropdown-item" (click)="navigateTo('/order-history')">Order History</a>
-              </li>
-              <li *ngIf="isCustomer">
-                <a class="dropdown-item" (click)="openRoleRequestModal('Merchant')">Become a Merchant</a>
-              </li>
-              <li *ngIf="isCustomer">
-                <a class="dropdown-item" (click)="openRoleRequestModal('DeliveryAgent')">Become a Delivery Agent</a>
-              </li>
-              <li *ngIf="isCustomer">
-                <a class="dropdown-item" (click)="openCheckRequestModal()">Show Role Request Status</a>
-              </li>
-
-              <!-- Logout -->
-              <li><hr class="dropdown-divider"></li>
-              <li>
-                <a class="dropdown-item" (click)="logout()">Logout</a>
-              </li>
-            </ul>
-          </li>
-        </ng-template>
-      </div>
-    </div>
-  </div>
-</nav>
-
-<!-- Confirmation Modal -->
-<div class="modal-backdrop" *ngIf="showConfirmModal">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h5>Confirm Role Change Request</h5>
-      <button type="button" class="close" (click)="closeConfirmModal()">
-        <span>×</span>
-      </button>
-    </div>
-    <div class="modal-body">
-      <p>Are you sure you want to apply to become a {{ selectedRole }}?</p>
-      <p>This action will change your role upon approval.</p>
-    </div>
-    <div class="modal-footer">
-      <button type="button" class="btn btn-secondary" (click)="closeConfirmModal()">Cancel</button>
-      <button type="button" class="btn btn-primary" (click)="confirmRoleRequest()">Confirm</button>
-    </div>
-  </div>
-</div>
-
-<!-- Pending Request Modal -->
-<div class="modal-backdrop" *ngIf="showPendingModal">
-  <div class="modal-content">
-    <div class="modal-header warning">
-      <h5>Pending Role Request</h5>
-      <button type="button" class="close" (click)="closePendingModal()">
-        <span>×</span>
-      </button>
-    </div>
-    <div class="modal-body">
-      <p>You already have a pending request to become a {{ roleRequest?.requestedRole }}.</p>
-      <p>Requested on: {{ roleRequest?.requestedAt | date:'medium' }}</p>
-    </div>
-    <div class="modal-footer">
-      <button type="button" class="btn btn-secondary" (click)="closePendingModal()">Close</button>
-    </div>
-  </div>
-</div>
-
-<!-- Role Request Status Modal -->
-<div class="modal-backdrop" *ngIf="showStatusModal">
-  <div class="modal-content">
-    <div class="modal-header info">
-      <h5>Role Request Status</h5>
-      <button type="button" class="close" (click)="closeStatusModal()">
-        <span>×</span>
-      </button>
-    </div>
-    <div class="modal-body">
-      <div *ngIf="roleRequest; else noRequest">
-        <p>Your request to become a <strong>{{ roleRequest.requestedRole }}</strong> is <strong>{{ roleRequest.status }}</strong>.</p>
-        <p><small>Requested on: {{ roleRequest.requestedAt | date:'medium' }}</small></p>
-        <p *ngIf="roleRequest.reviewedAt"><small>Reviewed on: {{ roleRequest.reviewedAt | date:'medium' }}</small></p>
-      </div>
-      <ng-template #noRequest>
-        <p>You do not have any pending role requests.</p>
-      </ng-template>
-    </div>
-    <div class="modal-footer">
-      <button type="button" class="btn btn-secondary" (click)="closeStatusModal()">Close</button>
-    </div>
-  </div>
-</div>
-
-<!-- Message Modal -->
-<div class="modal-backdrop" *ngIf="showMessageModal">
-  <div class="modal-content">
-    <div class="modal-header" [ngClass]="{'success': roleRequestMessage, 'error': errorMessage}">
-      <h5>{{ roleRequestMessage ? 'Request Submitted' : 'Error' }}</h5>
-      <button type="button" class="close" (click)="closeMessageModal()">
-        <span>×</span>
-      </button>
-    </div>
-    <div class="modal-body">
-      <div *ngIf="errorMessage" class="alert alert-danger" role="alert">
-        {{ errorMessage }}
-      </div>
-      <div *ngIf="roleRequestMessage" class="alert alert-success" role="alert">
-        {{ roleRequestMessage }}
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button type="button" class="btn btn-secondary" (click)="closeMessageModal()">Close</button>
-    </div>
-  </div>
-</div>
-```
-
----
-
-#### Component 2: `admin-dashboard`
-
-**`admin-dashboard.component.ts`**:
 ```typescript
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -613,7 +88,9 @@ export class AdminDashboardComponent implements OnInit {
 }
 ```
 
-**`admin-dashboard.component.html`**:
+#### Current `admin-dashboard.component.html`
+Here’s the HTML file, specifically the chart section that’s causing the issue:
+
 ```html
 <div class="container py-5">
   <h2 class="mb-4">Admin Dashboard</h2>
@@ -730,7 +207,7 @@ export class AdminDashboardComponent implements OnInit {
 </div>
 ```
 
-**`admin-dashboard.component.css`**:
+#### Current `admin-dashboard.component.css`
 ```css
 .card {
   border-radius: 8px;
@@ -758,13 +235,28 @@ export class AdminDashboardComponent implements OnInit {
 
 ---
 
-#### Component 3: `pending-merchant-requests`
+### Step 2: Identify Potential Issues with the Chart
+The chart is using a `<chartjs>` component, which seems to be a custom component or directive for rendering Chart.js charts in Angular. Let’s explore why it might not be working. Here are some questions to guide us:
 
-**`pending-merchant-requests.component.ts`**:
+#### Question 1: Is the `<chartjs>` Component Properly Imported?
+The `<chartjs>` component isn’t a standard Angular component—it’s likely a custom component or directive provided by a library or created in your project. In the `admin-dashboard.component.ts`, you’ve imported `CommonModule` and `RouterLink`, but there’s no import for the `<chartjs>` component.
+
+- **What to Check**: Have you imported the module or component that provides the `<chartjs>` directive in your `admin-dashboard.component.ts`? For example, if you’re using a library like `ng2-charts` (a popular library for Chart.js in Angular), you need to import `NgChartsModule` in your component or module.
+- **Action**: Let’s assume you’re using `ng2-charts`. You need to install it and import it. If you’ve already run `npm install`, let’s verify the imports.
+
+Run the following commands if you haven’t already:
+```bash
+npm install chart.js ng2-charts
+```
+
+Then, update the `admin-dashboard.component.ts` to import `NgChartsModule`:
+
 ```typescript
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RoleService } from '../../services/role.service';
+import { RouterLink } from '@angular/router';
+import { NgChartsModule } from 'ng2-charts'; // Import NgChartsModule
 
 interface RoleRequest {
   id: number;
@@ -782,14 +274,17 @@ interface RoleRequest {
 }
 
 @Component({
-  selector: 'app-pending-merchant-requests',
+  selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule],
-  templateUrl: './pending-merchant-requests.component.html',
-  styleUrls: ['./pending-merchant-requests.component.css']
+  imports: [CommonModule, RouterLink, NgChartsModule], // Add NgChartsModule to imports
+  templateUrl: './admin-dashboard.component.html',
+  styleUrls: ['./admin-dashboard.component.css']
 })
-export class PendingMerchantRequestsComponent implements OnInit {
-  requests: RoleRequest[] = [];
+export class AdminDashboardComponent implements OnInit {
+  pendingRequests: RoleRequest[] = [];
+  totalPendingRequests: number = 0;
+  merchantPendingRequests: number = 0;
+  deliveryAgentPendingRequests: number = 0;
 
   constructor(private roleService: RoleService) {}
 
@@ -800,91 +295,107 @@ export class PendingMerchantRequestsComponent implements OnInit {
   loadPendingRequests() {
     this.roleService.getPendingRequests().subscribe({
       next: (response) => {
-        console.log('getPendingRequests response for Merchant:', response);
+        console.log('getPendingRequests response:', response);
         if (response && typeof response.success === 'boolean') {
           if (response.success && response.data) {
-            this.requests = response.data.filter(req => req.requestedRole === 'Merchant');
-            console.log('Filtered Merchant requests:', this.requests);
+            this.pendingRequests = response.data;
+            this.totalPendingRequests = this.pendingRequests.length;
+            this.merchantPendingRequests = this.pendingRequests.filter(req => req.requestedRole === 'Merchant').length;
+            this.deliveryAgentPendingRequests = this.pendingRequests.filter(req => req.requestedRole === 'DeliveryAgent').length;
+            console.log('Pending requests loaded:', this.pendingRequests);
           } else {
-            console.log('No Merchant requests found');
-            this.requests = [];
+            console.log('No pending requests found');
+            this.pendingRequests = [];
+            this.totalPendingRequests = 0;
+            this.merchantPendingRequests = 0;
+            this.deliveryAgentPendingRequests = 0;
           }
         } else {
           console.error('Unexpected response format:', response);
-          this.requests = [];
+          this.pendingRequests = [];
+          this.totalPendingRequests = 0;
+          this.merchantPendingRequests = 0;
+          this.deliveryAgentPendingRequests = 0;
         }
       },
       error: (err) => {
         console.error('Error fetching pending requests:', err);
-        this.requests = [];
-      }
-    });
-  }
-
-  reviewRequest(requestId: number, status: string) {
-    console.log(`Reviewing request ID ${requestId} with status ${status}`);
-    this.roleService.reviewRequest({ requestId, status }).subscribe({
-      next: (response) => {
-        console.log('reviewRequest response:', response);
-        if (response && typeof response.success === 'boolean' && response.success) {
-          this.requests = this.requests.filter(req => req.id !== requestId);
-          console.log('Request reviewed and removed from list');
-        } else {
-          console.error('Failed to review request:', response?.message || 'Unknown error');
-        }
-      },
-      error: (err) => {
-        console.error('Error reviewing request:', err);
+        this.pendingRequests = [];
+        this.totalPendingRequests = 0;
+        this.merchantPendingRequests = 0;
+        this.deliveryAgentPendingRequests = 0;
       }
     });
   }
 }
 ```
 
-**`pending-merchant-requests.component.html`**:
-```html
-<div class="container py-5">
-  <h2>Pending Merchant Requests</h2>
-  <div class="mt-4">
-    <div *ngIf="requests.length > 0; else noRequests">
-      <table class="table table-bordered">
-        <thead>
-          <tr>
-            <th>User</th>
-            <th>Email</th>
-            <th>Requested At</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let request of requests">
-            <td>{{ request.user?.userName || 'N/A' }}</td>
-            <td>{{ request.user?.email || 'N/A' }}</td>
-            <td>{{ request.requestedAt | date:'medium' }}</td>
-            <td>
-              <button class="btn btn-success me-2" (click)="reviewRequest(request.id, 'Approved')">Approve</button>
-              <button class="btn btn-danger" (click)="reviewRequest(request.id, 'Rejected')">Reject</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <ng-template #noRequests>
-      <p>No pending Merchant requests found.</p>
-    </ng-template>
-  </div>
-</div>
-```
+- **Reflection**: If you’re not using `ng2-charts`, but instead a custom `<chartjs>` component, you need to ensure that component is imported. Can you confirm what library or component you’re using for the chart? For now, let’s proceed assuming `ng2-charts`, as it’s a common choice for Angular projects.
 
----
+#### Question 2: Is the Chart Configuration Compatible with `ng2-charts`?
+The `<chartjs>` component in your HTML uses a `[config]` input to pass the chart configuration. However, if you’re using `ng2-charts`, the component is typically `<canvas baseChart>`, not `<chartjs>`, and the configuration is passed differently using inputs like `[data]`, `[type]`, and `[options]`.
 
-#### Component 4: `pending-delivery-agent-requests`
+- **What to Check**: Let’s compare the current chart configuration with what `ng2-charts` expects. Here’s the current chart in the HTML:
 
-**`pending-delivery-agent-requests.component.ts`**:
+  ```html
+  <chartjs [config]="{
+    'type': 'pie',
+    'data': {
+      'labels': ['Merchant Requests', 'Delivery Agent Requests'],
+      'datasets': [{
+        'label': 'Pending Requests',
+        'data': [merchantPendingRequests, deliveryAgentPendingRequests],
+        'backgroundColor': ['#ffc107', '#17a2b8'],
+        'borderColor': ['#fff', '#fff'],
+        'borderWidth': 1
+      }]
+    },
+    'options': {
+      'responsive': true,
+      'maintainAspectRatio': false,
+      'plugins': {
+        'legend': {
+          'position': 'top',
+          'labels': {
+            'color': '#333'
+          }
+        },
+        'title': {
+          'display': true,
+          'text': 'Pending Requests Distribution',
+          'color': '#333',
+          'font': {
+            'size': 16
+          }
+        }
+      }
+    }
+  }"></chartjs>
+  ```
+
+  For `ng2-charts`, the chart should look like this:
+
+  ```html
+  <canvas baseChart
+    [type]="'pie'"
+    [data]="chartData"
+    [options]="chartOptions">
+  </canvas>
+  ```
+
+  We need to define `chartData` and `chartOptions` in the `.ts` file and update the HTML to use `baseChart`.
+
+- **Action**: Let’s modify the `admin-dashboard.component.ts` to define the chart data and options, and then update the HTML.
+
+Update `admin-dashboard.component.ts`:
+
 ```typescript
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RoleService } from '../../services/role.service';
+import { RouterLink } from '@angular/router';
+import { NgChartsModule } from 'ng2-charts'; // Import NgChartsModule
+import { ChartConfiguration, ChartData } from 'chart.js'; // Import Chart.js types
 
 interface RoleRequest {
   id: number;
@@ -902,14 +413,50 @@ interface RoleRequest {
 }
 
 @Component({
-  selector: 'app-pending-delivery-agent-requests',
+  selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule],
-  templateUrl: './pending-delivery-agent-requests.component.html',
-  styleUrls: ['./pending-delivery-agent-requests.component.css']
+  imports: [CommonModule, RouterLink, NgChartsModule],
+  templateUrl: './admin-dashboard.component.html',
+  styleUrls: ['./admin-dashboard.component.css']
 })
-export class PendingDeliveryAgentRequestsComponent implements OnInit {
-  requests: RoleRequest[] = [];
+export class AdminDashboardComponent implements OnInit {
+  pendingRequests: RoleRequest[] = [];
+  totalPendingRequests: number = 0;
+  merchantPendingRequests: number = 0;
+  deliveryAgentPendingRequests: number = 0;
+
+  // Chart data and options
+  public chartData: ChartData<'pie'> = {
+    labels: ['Merchant Requests', 'Delivery Agent Requests'],
+    datasets: [{
+      label: 'Pending Requests',
+      data: [0, 0], // Initialize with zeros; will update after data fetch
+      backgroundColor: ['#ffc107', '#17a2b8'],
+      borderColor: ['#fff', '#fff'],
+      borderWidth: 1
+    }]
+  };
+
+  public chartOptions: ChartConfiguration['options'] = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top',
+        labels: {
+          color: '#333'
+        }
+      },
+      title: {
+        display: true,
+        text: 'Pending Requests Distribution',
+        color: '#333',
+        font: {
+          size: 16
+        }
+      }
+    }
+  };
 
   constructor(private roleService: RoleService) {}
 
@@ -920,119 +467,296 @@ export class PendingDeliveryAgentRequestsComponent implements OnInit {
   loadPendingRequests() {
     this.roleService.getPendingRequests().subscribe({
       next: (response) => {
-        console.log('getPendingRequests response for Delivery Agent:', response);
+        console.log('getPendingRequests response:', response);
         if (response && typeof response.success === 'boolean') {
           if (response.success && response.data) {
-            this.requests = response.data.filter(req => req.requestedRole === 'DeliveryAgent');
-            console.log('Filtered Delivery Agent requests:', this.requests);
+            this.pendingRequests = response.data;
+            this.totalPendingRequests = this.pendingRequests.length;
+            this.merchantPendingRequests = this.pendingRequests.filter(req => req.requestedRole === 'Merchant').length;
+            this.deliveryAgentPendingRequests = this.pendingRequests.filter(req => req.requestedRole === 'DeliveryAgent').length;
+            console.log('Pending requests loaded:', this.pendingRequests);
+
+            // Update chart data
+            this.chartData.datasets[0].data = [this.merchantPendingRequests, this.deliveryAgentPendingRequests];
           } else {
-            console.log('No Delivery Agent requests found');
-            this.requests = [];
+            console.log('No pending requests found');
+            this.pendingRequests = [];
+            this.totalPendingRequests = 0;
+            this.merchantPendingRequests = 0;
+            this.deliveryAgentPendingRequests = 0;
+            this.chartData.datasets[0].data = [0, 0];
           }
         } else {
           console.error('Unexpected response format:', response);
-          this.requests = [];
+          this.pendingRequests = [];
+          this.totalPendingRequests = 0;
+          this.merchantPendingRequests = 0;
+          this.deliveryAgentPendingRequests = 0;
+          this.chartData.datasets[0].data = [0, 0];
         }
       },
       error: (err) => {
         console.error('Error fetching pending requests:', err);
-        this.requests = [];
-      }
-    });
-  }
-
-  reviewRequest(requestId: number, status: string) {
-    console.log(`Reviewing request ID ${requestId} with status ${status}`);
-    this.roleService.reviewRequest({ requestId, status }).subscribe({
-      next: (response) => {
-        console.log('reviewRequest response:', response);
-        if (response && typeof response.success === 'boolean' && response.success) {
-          this.requests = this.requests.filter(req => req.id !== requestId);
-          console.log('Request reviewed and removed from list');
-        } else {
-          console.error('Failed to review request:', response?.message || 'Unknown error');
-        }
-      },
-      error: (err) => {
-        console.error('Error reviewing request:', err);
+        this.pendingRequests = [];
+        this.totalPendingRequests = 0;
+        this.merchantPendingRequests = 0;
+        this.deliveryAgentPendingRequests = 0;
+        this.chartData.datasets[0].data = [0, 0];
       }
     });
   }
 }
 ```
 
-**`pending-delivery-agent-requests.component.html`**:
+Update `admin-dashboard.component.html` to use `baseChart`:
+
 ```html
 <div class="container py-5">
-  <h2>Pending Delivery Agent Requests</h2>
-  <div class="mt-4">
-    <div *ngIf="requests.length > 0; else noRequests">
-      <table class="table table-bordered">
-        <thead>
-          <tr>
-            <th>User</th>
-            <th>Email</th>
-            <th>Requested At</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let request of requests">
-            <td>{{ request.user?.userName || 'N/A' }}</td>
-            <td>{{ request.user?.email || 'N/A' }}</td>
-            <td>{{ request.requestedAt | date:'medium' }}</td>
-            <td>
-              <button class="btn btn-success me-2" (click)="reviewRequest(request.id, 'Approved')">Approve</button>
-              <button class="btn btn-danger" (click)="reviewRequest(request.id, 'Rejected')">Reject</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+  <h2 class="mb-4">Admin Dashboard</h2>
+
+  <!-- Overview Cards -->
+  <div class="row mb-5">
+    <div class="col-md-4 mb-3">
+      <div class="card text-center shadow-sm">
+        <div class="card-header bg-primary text-white">
+          <h5 class="card-title mb-0">Total Pending Requests</h5>
+        </div>
+        <div class="card-body">
+          <p class="display-4">{{ totalPendingRequests }}</p>
+          <a [routerLink]="['/pending-merchant-requests']" class="btn btn-outline-primary">View All Requests</a>
+        </div>
+      </div>
     </div>
-    <ng-template #noRequests>
-      <p>No pending Delivery Agent requests found.</p>
-    </ng-template>
+    <div class="col-md-4 mb-3">
+      <div class="card text-center shadow-sm">
+        <div class="card-header bg-warning text-dark">
+          <h5 class="card-title mb-0">Pending Merchant Requests</h5>
+        </div>
+        <div class="card-body">
+          <p class="display-4">{{ merchantPendingRequests }}</p>
+          <a [routerLink]="['/pending-merchant-requests']" class="btn btn-outline-warning">View Merchant Requests</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4 mb-3">
+      <div class="card text-center shadow-sm">
+        <div class="card-header bg-info text-white">
+          <h5 class="card-title mb-0">Pending Delivery Agent Requests</h5>
+        </div>
+        <div class="card-body">
+          <p class="display-4">{{ deliveryAgentPendingRequests }}</p>
+          <a [routerLink]="['/pending-delivery-agent-requests']" class="btn btn-outline-info">View Delivery Agent Requests</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart Section -->
+  <div class="row mb-5">
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-header bg-light">
+          <h5 class="card-title mb-0">Pending Requests Distribution</h5>
+        </div>
+        <div class="card-body">
+          <div class="chart-container">
+            <div *ngIf="totalPendingRequests > 0">
+              <canvas baseChart
+                [type]="'pie'"
+                [data]="chartData"
+                [options]="chartOptions">
+              </canvas>
+            </div>
+            <p *ngIf="totalPendingRequests === 0" class="text-center text-muted">No pending requests to display.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="row">
+    <div class="col-md-6 mb-3">
+      <div class="card quick-action-card shadow-sm">
+        <div class="card-body text-center">
+          <h5 class="card-title">Review Merchant Requests</h5>
+          <p class="card-text">Approve or reject pending Merchant applications.</p>
+          <a [routerLink]="['/pending-merchant-requests']" class="btn btn-primary">Go to Requests</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 mb-3">
+      <div class="card quick-action-card shadow-sm">
+        <div class="card-body text-center">
+          <h5 class="card-title">Review Delivery Agent Requests</h5>
+          <p class="card-text">Approve or reject pending Delivery Agent applications.</p>
+          <a [routerLink]="['/pending-delivery-agent-requests']" class="btn btn-primary">Go to Requests</a>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 ```
 
+- **Reflection**: This change aligns the chart with `ng2-charts`’ expectations. The chart should now render if `NgChartsModule` is properly imported and the data is being fetched correctly.
+
+#### Question 3: Is the Chart Data Being Populated Correctly?
+The chart data relies on `merchantPendingRequests` and `deliveryAgentPendingRequests`, which are updated in the `loadPendingRequests` method. Let’s ensure the data is being fetched and set correctly.
+
+- **What to Check**: Add a console log to verify the values of `merchantPendingRequests` and `deliveryAgentPendingRequests` after they’re set. You’ve already got a log for the response (`console.log('Pending requests loaded:', this.pendingRequests);`), but let’s add one specifically for the chart data.
+
+In `admin-dashboard.component.ts`, modify the `loadPendingRequests` method to add a log:
+
+```typescript
+loadPendingRequests() {
+  this.roleService.getPendingRequests().subscribe({
+    next: (response) => {
+      console.log('getPendingRequests response:', response);
+      if (response && typeof response.success === 'boolean') {
+        if (response.success && response.data) {
+          this.pendingRequests = response.data;
+          this.totalPendingRequests = this.pendingRequests.length;
+          this.merchantPendingRequests = this.pendingRequests.filter(req => req.requestedRole === 'Merchant').length;
+          this.deliveryAgentPendingRequests = this.pendingRequests.filter(req => req.requestedRole === 'DeliveryAgent').length;
+          console.log('Pending requests loaded:', this.pendingRequests);
+          console.log('Chart data updated:', {
+            merchantPendingRequests: this.merchantPendingRequests,
+            deliveryAgentPendingRequests: this.deliveryAgentPendingRequests
+          });
+
+          // Update chart data
+          this.chartData.datasets[0].data = [this.merchantPendingRequests, this.deliveryAgentPendingRequests];
+        } else {
+          console.log('No pending requests found');
+          this.pendingRequests = [];
+          this.totalPendingRequests = 0;
+          this.merchantPendingRequests = 0;
+          this.deliveryAgentPendingRequests = 0;
+          this.chartData.datasets[0].data = [0, 0];
+        }
+      } else {
+        console.error('Unexpected response format:', response);
+        this.pendingRequests = [];
+        this.totalPendingRequests = 0;
+        this.merchantPendingRequests = 0;
+        this.deliveryAgentPendingRequests = 0;
+        this.chartData.datasets[0].data = [0, 0];
+      }
+    },
+    error: (err) => {
+      console.error('Error fetching pending requests:', err);
+      this.pendingRequests = [];
+      this.totalPendingRequests = 0;
+      this.merchantPendingRequests = 0;
+      this.deliveryAgentPendingRequests = 0;
+      this.chartData.datasets[0].data = [0, 0];
+    }
+  });
+}
+```
+
+- **Reflection**: After making this change, check the console logs when you load the Admin Dashboard. Do you see the `Chart data updated` log with non-zero values for `merchantPendingRequests` or `deliveryAgentPendingRequests`? If both are zero, the chart won’t render because of the `*ngIf="totalPendingRequests > 0"` condition. If the data is zero, you might need to create some pending requests in your application to test the chart.
+
+#### Question 4: Are There Any Console Errors?
+Sometimes, the chart fails to render due to runtime errors, such as missing dependencies or incorrect configuration.
+
+- **What to Check**: Open your browser’s developer tools (F12) and check the console for any errors when you load the Admin Dashboard. Look for errors related to `ng2-charts`, `chart.js`, or the `<canvas baseChart>` component.
+- **Common Errors**:
+  - **“Cannot find module ‘ng2-charts’”**: This means `ng2-charts` isn’t installed or imported correctly.
+  - **“baseChart is not a known element”**: This means `NgChartsModule` isn’t imported in the component’s `imports` array.
+  - **Chart.js-related errors**: Ensure `chart.js` is installed (`npm install chart.js`).
+
+- **Action**: If you see any errors, let’s address them. For now, since you’ve already run `npm install`, let’s assume the issue might be with the import. If you still see errors after the changes above, note them down and we’ll tackle them next.
+
+#### Question 5: Is the Chart Container Styled Correctly?
+The chart is inside a `<div class="chart-container">`, which has the following CSS:
+
+```css
+.chart-container {
+  position: relative;
+  height: 300px;
+  width: 100%;
+}
+```
+
+- **What to Check**: Is the chart container visible on the page? If the chart is rendering but not visible, it might be a styling issue (e.g., zero height, hidden by CSS, etc.).
+- **Action**: Inspect the `<canvas>` element in your browser’s developer tools. Does it have a non-zero height and width? If not, let’s adjust the CSS to ensure the chart is visible.
+
+Update `admin-dashboard.component.css` to make sure the canvas takes up the full container space:
+
+```css
+.card {
+  border-radius: 8px;
+}
+.card-header {
+  border-bottom: none;
+}
+.display-4 {
+  font-size: 2.5rem;
+  color: #333;
+}
+.quick-action-card {
+  transition: transform 0.2s;
+}
+.quick-action-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+.chart-container {
+  position: relative;
+  height: 300px;
+  width: 100%;
+}
+.chart-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+```
+
+- **Reflection**: This ensures the `<canvas>` element inside the chart container takes up the full width and height, making the chart visible.
+
 ---
 
-### Step 2: Testing Scenarios
+### Step 3: Test the Changes
+Let’s test the updated code to see if the chart renders correctly.
 
-Let’s test all scenarios to ensure everything works as expected with the separated files:
+- **Steps**:
+  1. Ensure `chart.js` and `ng2-charts` are installed:
+     ```bash
+     npm install chart.js ng2-charts
+     ```
+  2. Verify the updated `admin-dashboard.component.ts`, `admin-dashboard.component.html`, and `admin-dashboard.component.css` files are in place.
+  3. Log in as an Admin and navigate to `/admin-dashboard`.
+  4. Check the console logs for the `Chart data updated` message to confirm the data values.
+  5. Inspect the chart section in the browser to see if the `<canvas>` element is rendering the pie chart.
 
-- **Customer**:
-  - Log in as a Customer.
-  - Click "Become a Merchant":
-    - If no existing request: See confirm modal, click "Confirm", request should be submitted.
-    - If existing request: See pending modal.
-  - Click "Become a Delivery Agent": Same behavior.
-  - Click "Show Role Request Status": See status modal with request details.
-- **Admin**:
-  - Log in as an Admin.
-  - Go to `/admin-dashboard`:
-    - See updated counts and chart.
-  - Go to `/pending-merchant-requests` and `/pending-delivery-agent-requests`:
-    - See filtered requests.
-    - Approve or reject requests, and they should disappear from the list.
+- **Expected Outcome**:
+  - If there are pending requests (`totalPendingRequests > 0`), you should see a pie chart showing the distribution of Merchant and Delivery Agent requests.
+  - If there are no pending requests, you should see the message “No pending requests to display.”
+
+#### Question 6: Does the Chart Render Now?
+After making these changes, does the chart appear on the page? If not, what do you see instead? Are there any new console errors?
+
+- **If the Chart Still Doesn’t Render**:
+  - Check the console for errors.
+  - Verify the data values in the `Chart data updated` log. If both `merchantPendingRequests` and `deliveryAgentPendingRequests` are 0, create some test requests in your application (e.g., as a Customer, request to become a Merchant or Delivery Agent).
+  - Ensure the `<canvas>` element is visible in the DOM and has a non-zero size.
 
 ---
 
-### Step 3: Summary
+### Step 4: Summary
+**It’s 01:35 AM IST on Tuesday, May 20, 2025.**
 
-**It’s 12:55 AM IST on Tuesday, May 20, 2025.**
+We’ve explored several potential reasons why the chart might not be rendering and made the following changes:
 
-- **Separated `.ts` and `.html` Files**:
-  - `header.component.ts` and `header.component.html`
-  - `admin-dashboard.component.ts` and `admin-dashboard.component.html`
-  - `pending-merchant-requests.component.ts` and `pending-merchant-requests.component.html`
-  - `pending-delivery-agent-requests.component.ts` and `pending-delivery-agent-requests.component.html`
-- **Previous Fixes Retained**:
-  - Customer role request flow: Dialog boxes for "Become a Merchant", "Become a Delivery Agent", and "Show Role Request Status" are fixed.
-  - Admin features: Dashboard displays counts and chart; pending requests are filtered, and Admin can approve/reject them.
-- **Next Steps**:
-  - Place these files in your project’s appropriate directories (e.g., `src/app/components/header`, `src/app/components/admin-dashboard`, etc.).
-  - Test thoroughly to ensure everything works as expected.
+- **Updated Imports**: Added `NgChartsModule` to the `imports` array in `admin-dashboard.component.ts`.
+- **Adjusted Chart Configuration**: Changed the chart to use `ng2-charts`’ `baseChart` directive, defining `chartData` and `chartOptions` in the `.ts` file.
+- **Added Debugging**: Added a console log to verify the chart data.
+- **Updated Styling**: Ensured the chart container and canvas have proper dimensions.
 
-I’ve separated the `.ts` and `.html` files for each component, bro. Please test them in your project, and let me know if you need any more adjustments or if there’s anything else to fix. Let’s get this done! 🚀
+Please test the updated code and let me know:
+- Does the chart render now?
+- If not, what errors do you see in the console?
+- Are the data values for `merchantPendingRequests` and `deliveryAgentPendingRequests` non-zero?
+
+We’ll keep digging until the chart is working perfectly, bro! 🚀
